@@ -13,13 +13,13 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.get('/:vioo', async (req, res) => {
-    const senka = req.params.senka;
+app.get('/:fileName', async (req, res) => {
+    const { fileName } = req.params;
 
     try {
         const { data, error } = await supabase.storage
             .from(BUCKET_NAME)
-            .download(senka);
+            .download(fileName);
 
         if (error) {
             return res.status(404).json({ error: 'File not found or inaccessible' });
@@ -34,6 +34,7 @@ app.get('/:vioo', async (req, res) => {
             'png': 'image/png',
             'gif': 'image/gif',
             'svg': 'image/svg+xml',
+            'webp': 'image/webp',
             'pdf': 'application/pdf',
             'mp4': 'video/mp4',
             'mov': 'video/quicktime',
@@ -43,7 +44,7 @@ app.get('/:vioo', async (req, res) => {
             'css': 'text/css',
             'js': 'application/javascript'
         };
-        const fileExt = senka.split('.').pop()?.toLowerCase();
+        const fileExt = fileName.split('.').pop()?.toLowerCase();
         const contentType = mimeTypes[fileExt] || 'application/octet-stream';
 
         res.setHeader('Content-Type', contentType);
@@ -51,7 +52,7 @@ app.get('/:vioo', async (req, res) => {
 
         res.send(buffer);
     } catch (err) {
-        console.error(err);
+        console.error('Internal server error:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
