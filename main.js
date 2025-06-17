@@ -13,10 +13,69 @@ const BUCKET_NAME = 'vioo-uploader';
 const CUSTOM_DOMAIN = 'https://cdn.vioo.my.id';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const upload = multer({ storage: multer.memoryStorage() });
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
+
+app.post('/upload', upload.single('file'), async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded.' });
+    }
+
+    try {
+        const fileBuffer = req.file.buffer;
+        const fileHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+
+        const { data: existingFile, error: checkError } = await supabase
+            .from('file_deduplication')
+            .select('file_path')
+            .eq('file_hash', fileHash)
+            .single();
+
+        if (checkError && checkError.code !== 'PGRST116') {
+            throw checkError;
+        }
+
+        if (existingFile) {
+            const fileUrl = `${CUSTOM_DOMAIN}/v/${existingFile.file_path}`;
+            return res.json({ success: true, url: fileUrl, message: 'File already exists.' });
+        }
+
+        const fileExt = path.extname(req.file.originalname).substring(1).toLowerCase() || 'bin';
+        const randomId = crypto.randomBytes(4).toString('hex');
+        const filePath = `${randomId}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+            .from(BUCKET_NAME)
+            .upload(filePath, fileBuffer, {
+                contentType: req.file.mimetype,
+                cacheControl: '3600',
+                upsert: false
+            });
+
+        if (uploadError) {
+            throw uploadError;
+        }
+
+        const { error: recordError } = await supabase
+            .from('file_deduplication')
+            .insert({ file_hash: fileHash, file_path: filePath });
+
+        if (recordError) {
+            await supabase.storage.from(BUCKET_NAME).remove([filePath]);
+            throw recordError;
+        }
+
+        const newFileUrl = `${CUSTOM_DOMAIN}/v/${filePath}`;
+        res.status(201).json({ success: true, url: newFileUrl, message: 'Upload successful!' });
+
+    } catch (err) {
+        res.status(500).json({ error: 'Could not process file upload.', details: err.message });
+    }
+});
+
 
 app.post('/check-hash', async (req, res) => {
     const { fileHash } = req.body;
@@ -61,69 +120,6 @@ app.post('/record-upload', async (req, res) => {
         res.status(500).json({ error: 'Could not record upload', details: err.message });
     }
 });
-
-app.post('/upload', upload.single('file'), async (req, res) => {
-    if (!req.file) {
-        return res.status(400).json({ success: false, error: 'No file uploaded. Please use the "file" key in your form-data.' });
-    }
-
-    try {
-        const fileBuffer = req.file.buffer;
-        const fileHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
-
-        const { data: existingFile, error: checkError } = await supabase
-            .from('file_deduplication')
-            .select('file_path')
-            .eq('file_hash', fileHash)
-            .single();
-
-        if (checkError && checkError.code !== 'PGRST116') {
-            throw checkError;
-        }
-
-        if (existingFile) {
-            return res.json({
-                success: true,
-                message: 'File already exists.',
-                url: `${CUSTOM_DOMAIN}/v/${existingFile.file_path}`
-            });
-        }
-
-        const fileExt = path.extname(req.file.originalname).substring(1).toLowerCase() || 'unknown';
-        const randomId = Math.random().toString(36).substring(2, 8);
-        const filePath = `${randomId}.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-            .from(BUCKET_NAME)
-            .upload(filePath, fileBuffer, {
-                contentType: req.file.mimetype,
-                cacheControl: '3600',
-                upsert: false
-            });
-
-        if (uploadError) {
-            throw uploadError;
-        }
-
-        const { error: recordError } = await supabase
-            .from('file_deduplication')
-            .insert({ file_hash: fileHash, file_path: filePath });
-
-        if (recordError) {
-            throw recordError;
-        }
-
-        res.status(201).json({
-            success: true,
-            message: 'File uploaded successfully.',
-            url: `${CUSTOM_DOMAIN}/v/${filePath}`
-        });
-
-    } catch (error) {
-        res.status(500).json({ success: false, error: 'An error occurred during file upload.', details: error.message });
-    }
-});
-
 
 app.get('/v/:fileName', async (req, res) => {
     const { fileName } = req.params;
