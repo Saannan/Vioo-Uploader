@@ -1,8 +1,8 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
-const path = require('path');
 const crypto = require('crypto');
 const multer = require('multer');
+const path = require('path');
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -14,7 +14,6 @@ const BUCKET_NAME = 'vioo-uploader';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const upload = multer({ storage: multer.memoryStorage() });
 
-app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
 app.post('/upload', upload.single('file'), async (req, res) => {
@@ -26,7 +25,6 @@ app.post('/upload', upload.single('file'), async (req, res) => {
         const fileBuffer = req.file.buffer;
         const originalName = req.file.originalname;
         const mimeType = req.file.mimetype;
-
         const fileHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
 
         const { data: existingFile, error: checkError } = await supabase
@@ -49,7 +47,7 @@ app.post('/upload', upload.single('file'), async (req, res) => {
         const randomId = Math.random().toString(36).substring(2, 8);
         const filePath = `${randomId}.${fileExt}`;
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
             .from(BUCKET_NAME)
             .upload(filePath, fileBuffer, { contentType: mimeType, upsert: false });
 
@@ -151,15 +149,14 @@ app.get('/v/:fileName', async (req, res) => {
         res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
         res.send(buffer);
     } catch (err) {
-        console.error('Internal server error:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+if (process.env.VERCEL_ENV !== 'production') {
+    app.listen(port, () => {
+        console.log(`Server is running on http://localhost:${port}`);
+    });
+}
 
-app.listen(port, () => {
-    console.log(`Server is running on http://localhost:${port}`);
-});
+module.exports = app;
