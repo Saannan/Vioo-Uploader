@@ -4,6 +4,18 @@ const path = require('path');
 const multer = require('multer');
 const crypto = require('crypto');
 
+function randomCharacter(amount) {
+    const letter = 'abcdefghijklmnopqrstuvwxyz';
+    let results = '';
+    for (let i = 0; i < amount; i++) {
+        const randomIndex = Math.floor(Math.random() * letter.length);
+        let randomLetters = letter[randomIndex];
+        randomLetters = Math.random() < 0.5 ? randomLetters.toUpperCase() : randomLetters;
+        results += randomLetters;
+    }
+    return results;
+}
+
 const app = express();
 const port = process.env.PORT || 5000;
 
@@ -47,11 +59,20 @@ app.post('/upload', upload.single('file'), async (req, res) => {
 
         if (existingFile) {
             const fileUrl = `${CUSTOM_DOMAIN}/v/${existingFile.file_path}`;
-            return res.json({ success: true, url: fileUrl, message: 'File already exists.' });
+            const fileDetails = {
+                name: req.file.originalname,
+                size: req.file.size,
+                mimetype: req.file.mimetype,
+                extension: path.extname(existingFile.file_path).substring(1).toLowerCase(),
+                file_id: existingFile.file_path,
+                url: fileUrl,
+                date: new Date().toISOString()
+            };
+            return res.json({ success: true, message: 'File already exists.', details: fileDetails });
         }
 
         const fileExt = path.extname(req.file.originalname).substring(1).toLowerCase() || 'bin';
-        const randomId = crypto.randomBytes(4).toString('hex');
+        const randomId = randomCharacter(6);
         const filePath = `${randomId}.${fileExt}`;
 
         const { error: uploadError } = await supabase.storage
@@ -76,7 +97,16 @@ app.post('/upload', upload.single('file'), async (req, res) => {
         }
 
         const newFileUrl = `${CUSTOM_DOMAIN}/v/${filePath}`;
-        res.status(201).json({ success: true, url: newFileUrl, message: 'Upload successful!' });
+        const fileDetails = {
+            name: req.file.originalname,
+            size: req.file.size,
+            mimetype: req.file.mimetype,
+            extension: fileExt,
+            file_id: filePath,
+            url: newFileUrl,
+            date: new Date().toISOString()
+        };
+        res.status(201).json({ success: true, message: 'Upload successful!', details: fileDetails });
 
     } catch (err) {
         res.status(500).json({ error: 'Could not process file upload.', details: err.message });
