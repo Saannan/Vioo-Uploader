@@ -135,9 +135,8 @@
 
                 if (checkData.exists) {
                     const existingUrl = `${CUSTOM_DOMAIN}/v/${checkData.path}`;
-                    renderDetailCard(file);
                     showToast('File already exists!', 'success');
-                    copyToClipboard(existingUrl, null, true);
+                    renderDetailCard(file, existingUrl);
                     return;
                 }
                 
@@ -162,8 +161,8 @@
                 });
                 
                 const customDomainUrl = `${CUSTOM_DOMAIN}/v/${filePath}`;
-                renderDetailCard(file, customDomainUrl);
                 showToast('Upload Successful!', 'success');
+                renderDetailCard(file, customDomainUrl);
 
             } catch (error) {
                 showToast(error.message, 'error');
@@ -173,6 +172,31 @@
             }
         };
         
+        const renderLoadingState = () => {
+            resultArea.innerHTML = '';
+            const loadingStates = ["Checking file...", "Securing connection...", "Almost there...", "Uploading..."];
+            let stateIndex = 0;
+            
+            resultArea.innerHTML = `
+                <div class="flex items-center justify-center gap-3 p-4">
+                    <svg class="w-5 h-5 animate-spin text-[#ffc300]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span id="loadingText" class="text-xs text-slate-300 transition-opacity duration-300">${loadingStates[0]}</span>
+                </div>`;
+            
+            const loadingTextElement = document.getElementById('loadingText');
+            loadingInterval = setInterval(() => {
+                stateIndex = (stateIndex + 1) % loadingStates.length;
+                loadingTextElement.style.opacity = '0';
+                setTimeout(() => {
+                    loadingTextElement.textContent = loadingStates[stateIndex];
+                    loadingTextElement.style.opacity = '1';
+                }, 300);
+            }, 1500);
+        };
+
         const renderDetailCard = (file, url) => {
             resetFileInput();
             const fileExt = file.name.split('.').pop()?.toLowerCase() || 'default';
@@ -181,23 +205,23 @@
             
             resultArea.innerHTML = `
                 <div class="w-full text-left bg-[#2a2a4e]/50 border border-[#4a4a6a] rounded-md p-3 flex items-center gap-3 relative transition-all duration-300">
+                    <button class="btn-copy absolute top-2 right-2 text-slate-400 hover:text-white transition-colors" title="Copy link">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM5 11a1 1 0 100 2h4a1 1 0 100-2H5z"></path><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3 1h10a1 1 0 011 1v8a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z" clip-rule="evenodd"></path></svg>
+                    </button>
                     <div class="flex-shrink-0">${iconSVG}</div>
                     <div class="flex-grow overflow-hidden">
                         <p class="text-xs text-slate-100 font-semibold truncate" title="${file.name}">${file.name}</p>
                         <p class="text-[10px] text-slate-400">${formatFileSize(file.size)} - ${file.type || 'unknown type'}</p>
                     </div>
                 </div>`;
-            
-            if(url) {
-                copyToClipboard(url, null, true);
-            }
+            resultArea.querySelector('.btn-copy').addEventListener('click', (e) => copyToClipboard(url, e.currentTarget));
         };
 
         const resetFileInput = () => {
              fileInput.value = null;
              selectedFileDiv.innerHTML = '';
              selectedFileDiv.classList.add('hidden');
-        }
+        };
         
         const updateFileInfo = () => {
             resultArea.innerHTML = '';
@@ -226,11 +250,12 @@
         
         const setLoadingState = (isLoading) => {
             clearInterval(loadingInterval);
-            resultArea.innerHTML = '';
             uploadBtn.disabled = isLoading;
             if (isLoading) {
+                resultArea.innerHTML = '';
                 uploadBtn.classList.add('animate-pulse');
                 uploadBtn.textContent = '...';
+                renderLoadingState();
             } else {
                 uploadBtn.classList.remove('animate-pulse');
                 uploadBtn.textContent = 'Upload';
@@ -276,11 +301,9 @@
             }, 3000);
         };
 
-        const copyToClipboard = (text, buttonElement, silent = false) => {
+        const copyToClipboard = (text) => {
             navigator.clipboard.writeText(text).then(() => {
-                if (!silent) {
-                    showToast('Link copied to clipboard!', 'success');
-                }
+                showToast('Link copied to clipboard!', 'success');
             });
         };
         
