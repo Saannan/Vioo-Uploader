@@ -16,6 +16,21 @@ function randomCharacter(amount) {
     return results;
 }
 
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+}
+
+function formatDate(date) {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month} ${year}`;
+}
+
 const app = express();
 const port = process.env.PORT || 5000;
 
@@ -46,6 +61,7 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     try {
         const fileBuffer = req.file.buffer;
         const fileHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+        const uploadDate = new Date();
 
         const { data: existingFile, error: checkError } = await supabase
             .from('file_deduplication')
@@ -60,15 +76,15 @@ app.post('/upload', upload.single('file'), async (req, res) => {
         if (existingFile) {
             const fileUrl = `${CUSTOM_DOMAIN}/v/${existingFile.file_path}`;
             const fileDetails = {
+                id: path.parse(existingFile.file_path).name,
                 name: req.file.originalname,
-                size: req.file.size,
+                size: formatFileSize(req.file.size),
                 mimetype: req.file.mimetype,
                 extension: path.extname(existingFile.file_path).substring(1).toLowerCase(),
-                file_id: existingFile.file_path,
                 url: fileUrl,
-                date: new Date().toISOString()
+                date: formatDate(uploadDate)
             };
-            return res.json({ success: true, message: 'File already exists.', details: fileDetails });
+            return res.json({ success: true, message: 'File already exists.', data: fileDetails });
         }
 
         const fileExt = path.extname(req.file.originalname).substring(1).toLowerCase() || 'bin';
@@ -98,18 +114,18 @@ app.post('/upload', upload.single('file'), async (req, res) => {
 
         const newFileUrl = `${CUSTOM_DOMAIN}/v/${filePath}`;
         const fileDetails = {
+            id: randomId,
             name: req.file.originalname,
-            size: req.file.size,
+            size: formatFileSize(req.file.size),
             mimetype: req.file.mimetype,
             extension: fileExt,
-            file_id: filePath,
             url: newFileUrl,
-            date: new Date().toISOString()
+            date: formatDate(uploadDate)
         };
-        res.status(201).json({ success: true, message: 'Upload successful!', details: fileDetails });
+        res.status(201).json({ success: true, message: 'Upload successful!', data: fileDetails });
 
     } catch (err) {
-        res.status(500).json({ error: 'Could not process file upload.', details: err.message });
+        res.status(500).json({ error: 'Could not process file upload.', data: err.message });
     }
 });
 
@@ -136,7 +152,7 @@ app.post('/check-hash', async (req, res) => {
             res.json({ exists: false });
         }
     } catch (err) {
-        res.status(500).json({ error: 'Could not check hash', details: err.message });
+        res.status(500).json({ error: 'Could not check hash', data: err.message });
     }
 });
 
@@ -154,7 +170,7 @@ app.post('/record-upload', async (req, res) => {
 
         res.status(201).json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: 'Could not record upload', details: err.message });
+        res.status(500).json({ error: 'Could not record upload', data: err.message });
     }
 });
 
