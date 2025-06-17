@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vioo Uploader</title>
-
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-
+    
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 
@@ -25,13 +25,45 @@
                 linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
             background-size: 20px 20px;
         }
+        @keyframes toast-enter {
+            from {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        @keyframes toast-exit {
+            from {
+                opacity: 1;
+                transform: translateX(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+        }
+        @keyframes progress-bar {
+            from { width: 100%; }
+            to { width: 0%; }
+        }
+        .animate-toast-enter {
+            animation: toast-enter 0.4s ease-out forwards;
+        }
+        .animate-toast-exit {
+            animation: toast-exit 0.4s ease-in forwards;
+        }
+        .animate-progress-bar {
+            animation: progress-bar 3s linear forwards;
+        }
     </style>
 </head>
 <body class="text-[#f0f0f0] min-h-screen flex items-center justify-center p-4">
 
     <main class="w-full max-w-md mx-auto">
         <div class="bg-[#1e1e3f]/80 backdrop-blur-sm border border-[#3a3a5a] rounded-lg shadow-2xl shadow-black/50 overflow-hidden">
-            
             <div class="p-5 text-center border-b border-[#3a3a5a]">
                 <h2 class="text-lg font-bold tracking-wide">
                     <span class="text-[#ffc300]">Vioo</span> Uploader
@@ -63,6 +95,8 @@
             </div>
         </div>
     </main>
+    
+    <div id="toast-container" class="fixed top-4 right-4 z-50 w-full max-w-xs space-y-2"></div>
 
     <script>
     document.addEventListener('DOMContentLoaded', () => {
@@ -78,6 +112,7 @@
         const resultArea = document.getElementById('resultArea');
         const selectedFileDiv = document.getElementById('selectedFile');
         const fileInputLabel = document.querySelector('.file-input-label');
+        const toastContainer = document.getElementById('toast-container');
 
         let loadingInterval;
 
@@ -106,7 +141,7 @@
         const uploadFile = async () => {
             const file = fileInput.files[0];
             if (!file) {
-                renderErrorMessage('Please select a file first.');
+                showToast('Please select a file first.', 'error');
                 return;
             }
 
@@ -130,7 +165,8 @@
 
                 if (checkData.exists) {
                     const existingUrl = `${CUSTOM_DOMAIN}/v/${checkData.path}`;
-                    renderSuccessMessage('File already exists!', file, existingUrl);
+                    renderFileDetails(file);
+                    showToast('File already exists!', 'info');
                     setLoadingState(false);
                     return;
                 }
@@ -156,10 +192,11 @@
                 });
                 
                 const customDomainUrl = `${CUSTOM_DOMAIN}/v/${filePath}`;
-                renderSuccessMessage('Upload Successful!', file, customDomainUrl);
+                renderFileDetails(file, customDomainUrl);
+                showToast('Upload Successful!', 'success');
 
             } catch (error) {
-                renderErrorMessage(error.message);
+                showToast(error.message, 'error');
             } finally {
                 setLoadingState(false);
             }
@@ -189,7 +226,7 @@
             }, 2000);
         };
         
-        const renderSuccessMessage = (title, file, url) => {
+        const renderFileDetails = (file, url) => {
             resetFileInput();
             const fileExt = file.name.split('.').pop()?.toLowerCase() || 'default';
             const group = fileTypeGroups[fileExt] || 'default';
@@ -202,23 +239,22 @@
                     </button>
                     <div class="flex-shrink-0">${iconSVG}</div>
                     <div class="flex-grow overflow-hidden">
-                        <h3 class="text-[11px] font-bold text-green-400">${title}</h3>
                         <p class="text-xs text-slate-100 font-semibold truncate" title="${file.name}">${file.name}</p>
                         <p class="text-[10px] text-slate-400">${formatFileSize(file.size)} - ${file.type || 'unknown type'}</p>
                     </div>
                 </div>`;
-            resultArea.querySelector('.btn-copy').addEventListener('click', (e) => copyToClipboard(url, e.currentTarget));
-        };
-        
-        const renderErrorMessage = (message) => {
-            resultArea.innerHTML = `<div class="w-full text-center p-2 bg-red-900/20 border border-red-500/30 rounded-md text-xs text-red-400">${message}</div>`;
+            if (url) {
+                 resultArea.querySelector('.btn-copy').addEventListener('click', (e) => copyToClipboard(url, e.currentTarget));
+            } else {
+                 resultArea.querySelector('.btn-copy').style.display = 'none';
+            }
         };
 
         const resetFileInput = () => {
              fileInput.value = null;
              selectedFileDiv.innerHTML = '';
              selectedFileDiv.classList.add('hidden');
-        }
+        };
         
         const updateFileInfo = () => {
             resultArea.innerHTML = '';
@@ -250,10 +286,31 @@
             uploadBtn.disabled = isLoading;
             if (isLoading) {
                 uploadBtn.textContent = '...';
+                resultArea.innerHTML = '';
                 renderLoadingState();
             } else {
                 uploadBtn.textContent = 'Upload';
+                resultArea.innerHTML = '';
             }
+        };
+        
+        const showToast = (message, type = 'info') => {
+            const toast = document.createElement('div');
+            const a = {
+                success: { bg: 'bg-green-500/10', border: 'border-green-500/30', text: 'text-green-300', icon: `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>`},
+                error: { bg: 'bg-red-500/10', border: 'border-red-500/30', text: 'text-red-300', icon: `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>`},
+                info: { bg: 'bg-sky-500/10', border: 'border-sky-500/30', text: 'text-sky-300', icon: `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>`}
+            };
+            const s = a[type];
+            toast.className = `w-full p-3 rounded-lg shadow-lg backdrop-blur-sm flex items-start gap-3 border ${s.bg} ${s.border} overflow-hidden`;
+            toast.innerHTML = `<div class="flex-shrink-0 ${s.text}">${s.icon}</div><p class="flex-grow text-xs font-semibold text-slate-100">${message}</p><div class="absolute bottom-0 left-0 h-0.5 ${s.bg} animate-progress-bar"></div>`;
+            toast.classList.add('animate-toast-enter');
+            toastContainer.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.remove('animate-toast-enter');
+                toast.classList.add('animate-toast-exit');
+                setTimeout(() => toast.remove(), 500);
+            }, 3000);
         };
 
         const copyToClipboard = (text, buttonElement) => {
