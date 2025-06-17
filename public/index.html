@@ -37,7 +37,7 @@
 
     <main class="w-full max-w-md mx-auto">
         <div class="bg-[#1e1e3f]/80 backdrop-blur-sm border border-[#3a3a5a] rounded-lg shadow-2xl shadow-black/50 overflow-hidden">
-            
+
             <div class="p-5 text-center border-b border-[#3a3a5a]">
                 <h2 class="text-lg font-bold tracking-wide">
                     <span class="text-[#ffc300]">Vioo</span> Uploader
@@ -123,11 +123,11 @@
                 const result = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(result.details || result.error || 'Upload failed.');
+                    throw new Error(result.message || result.error || 'Upload failed.');
                 }
                 
                 showToast(result.message || 'Upload Successful!', 'success');
-                renderDetailCard(file, result.url);
+                renderDetailCard(file, result.data.url);
 
             } catch (error) {
                 showToast(error.message, 'error');
