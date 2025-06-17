@@ -13,7 +13,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.get('/:fileName', async (req, res) => {
+app.get('/f/:fileName', async (req, res) => {
     const { fileName } = req.params;
 
     try {
@@ -29,23 +29,19 @@ app.get('/:fileName', async (req, res) => {
         const buffer = Buffer.from(arrayBuffer);
 
         const mimeTypes = {
-            'jpg': 'image/jpeg',
-            'jpeg': 'image/jpeg',
-            'png': 'image/png',
-            'gif': 'image/gif',
-            'svg': 'image/svg+xml',
-            'webp': 'image/webp',
-            'pdf': 'application/pdf',
-            'mp4': 'video/mp4',
-            'mov': 'video/quicktime',
-            'mp3': 'audio/mpeg',
-            'txt': 'text/plain',
-            'html': 'text/html',
-            'css': 'text/css',
-            'js': 'application/javascript'
+            'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png',
+            'gif': 'image/gif', 'svg': 'image/svg+xml', 'webp': 'image/webp',
+            'pdf': 'application/pdf', 'mp4': 'video/mp4', 'mov': 'video/quicktime',
+            'mp3': 'audio/mpeg', 'txt': 'text/plain', 'html': 'text/html',
+            'css': 'text/css', 'js': 'application/javascript'
         };
         const fileExt = fileName.split('.').pop()?.toLowerCase();
-        const contentType = mimeTypes[fileExt] || 'application/octet-stream';
+        
+        let contentType = mimeTypes[fileExt] || 'application/octet-stream';
+
+        if (fileExt === 'html' || fileExt === 'htm') {
+            contentType = 'text/plain';
+        }
 
         res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Length', buffer.length);
