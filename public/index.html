@@ -25,37 +25,16 @@
                 linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
             background-size: 20px 20px;
         }
-        @keyframes slide-in-right {
-            from {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
+        .toast {
+            transform: translateX(110%);
+            transition: transform 0.4s ease-in-out;
         }
-        @keyframes slide-out-right {
-            from {
-                transform: translateX(0);
-                opacity: 1;
-            }
-            to {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-        }
-        .toast-in {
-            animation: slide-in-right 0.5s forwards ease-out;
-        }
-        .toast-out {
-            animation: slide-out-right 0.5s forwards ease-in;
+        .toast.show {
+            transform: translateX(0);
         }
     </style>
 </head>
 <body class="text-[#f0f0f0] min-h-screen flex items-center justify-center p-4">
-
-    <div id="toast-container" class="fixed top-4 right-4 z-50 w-full max-w-xs space-y-2"></div>
 
     <main class="w-full max-w-md mx-auto">
         <div class="bg-[#1e1e3f]/80 backdrop-blur-sm border border-[#3a3a5a] rounded-lg shadow-2xl shadow-black/50 overflow-hidden">
@@ -87,7 +66,7 @@
                     </button>
                 </div>
                 
-                <div id="loadingArea" class="pt-2 min-h-[40px]"></div>
+                <div id="resultArea" class="pt-2"></div>
             </div>
         </div>
     </main>
@@ -103,14 +82,15 @@
         
         const fileInput = document.getElementById('fileInput');
         const uploadBtn = document.getElementById('uploadBtn');
-        const loadingArea = document.getElementById('loadingArea');
+        const resultArea = document.getElementById('resultArea');
         const selectedFileDiv = document.getElementById('selectedFile');
         const fileInputLabel = document.querySelector('.file-input-label');
-        const toastContainer = document.getElementById('toast-container');
 
         let loadingInterval;
+        let toastTimeout;
 
         const iconClasses = 'w-4 h-4 text-slate-400';
+        const bigIconClasses = 'w-6 h-6 text-[#ffc300]';
         const fileIconsSVG = {
             'pdf': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>`,
             'image': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>`,
@@ -119,6 +99,15 @@
             'archive': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>`,
             'code': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" /></svg>`,
             'default': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>`,
+        };
+        const bigFileIconsSVG = {
+             'pdf': `<svg class="${bigIconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>`,
+            'image': `<svg class="${bigIconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>`,
+            'video': `<svg class="${bigIconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 010 .656l-5.603 3.113a.375.375 0 01-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112z" /></svg>`,
+            'audio': `<svg class="${bigIconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V7.5A2.25 2.25 0 0013.5 6H5.25A2.25 2.25 0 003 8.25v8.25a2.25 2.25 0 002.25 2.25h3.841M15 18a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" /></svg>`,
+            'archive': `<svg class="${bigIconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>`,
+            'code': `<svg class="${bigIconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" /></svg>`,
+            'default': `<svg class="${bigIconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>`,
         };
         const fileTypeGroups = { 'png': 'image', 'jpg': 'image', 'jpeg': 'image', 'gif': 'image', 'svg': 'image', 'webp': 'image', 'mp4': 'video', 'mov': 'video', 'avi': 'video', 'mp3': 'audio', 'wav': 'audio', 'ogg': 'audio', 'zip': 'archive', 'rar': 'archive', '7z': 'archive', 'js': 'code', 'html': 'code', 'css': 'code', 'json': 'code', 'py': 'code', 'java': 'code', 'doc': 'pdf', 'docx': 'pdf', 'xls': 'pdf', 'xlsx': 'pdf', 'ppt': 'pdf', 'pptx': 'pdf' };
 
@@ -133,26 +122,22 @@
 
             try {
                 const fileHash = await generateFileHash(file);
-                
                 const checkResponse = await fetch('/check-hash', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ fileHash }),
                 });
-
                 if (!checkResponse.ok) {
                     const errorData = await checkResponse.json();
-                    throw new Error(errorData.error || 'Failed to check file.');
+                    throw new Error(errorData.details || 'Failed to check file.');
                 }
-                
                 const checkData = await checkResponse.json();
 
                 if (checkData.exists) {
                     const existingUrl = `${CUSTOM_DOMAIN}/v/${checkData.path}`;
-                    showToast('File already exists! Link copied.', 'success');
-                    navigator.clipboard.writeText(existingUrl);
-                    resetFileInput();
-                    setLoadingState(false);
+                    renderDetailCard(file);
+                    showToast('File already exists!', 'success');
+                    copyToClipboard(existingUrl, null, true);
                     return;
                 }
                 
@@ -177,73 +162,45 @@
                 });
                 
                 const customDomainUrl = `${CUSTOM_DOMAIN}/v/${filePath}`;
-                showToast('Upload successful! Link copied.', 'success');
-                navigator.clipboard.writeText(customDomainUrl);
-                resetFileInput();
+                renderDetailCard(file, customDomainUrl);
+                showToast('Upload Successful!', 'success');
 
             } catch (error) {
                 showToast(error.message, 'error');
+                resetFileInput();
             } finally {
                 setLoadingState(false);
             }
         };
-
-        const renderLoadingState = () => {
-            const loadingStates = ["Checking file...", "Securing connection...", "Almost there...", "Uploading..."];
-            let stateIndex = 0;
+        
+        const renderDetailCard = (file, url) => {
+            resetFileInput();
+            const fileExt = file.name.split('.').pop()?.toLowerCase() || 'default';
+            const group = fileTypeGroups[fileExt] || 'default';
+            const iconSVG = bigFileIconsSVG[group] || bigFileIconsSVG['default'];
             
-            loadingArea.innerHTML = `
-                <div class="flex items-center justify-center gap-3 p-2">
-                    <svg class="w-4 h-4 animate-spin text-[#ffc300]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <span id="loadingText" class="text-xs text-slate-300 transition-opacity duration-300">${loadingStates[0]}</span>
+            resultArea.innerHTML = `
+                <div class="w-full text-left bg-[#2a2a4e]/50 border border-[#4a4a6a] rounded-md p-3 flex items-center gap-3 relative transition-all duration-300">
+                    <div class="flex-shrink-0">${iconSVG}</div>
+                    <div class="flex-grow overflow-hidden">
+                        <p class="text-xs text-slate-100 font-semibold truncate" title="${file.name}">${file.name}</p>
+                        <p class="text-[10px] text-slate-400">${formatFileSize(file.size)} - ${file.type || 'unknown type'}</p>
+                    </div>
                 </div>`;
             
-            const loadingTextElement = document.getElementById('loadingText');
-            loadingInterval = setInterval(() => {
-                stateIndex = (stateIndex + 1) % loadingStates.length;
-                loadingTextElement.style.opacity = '0';
-                setTimeout(() => {
-                    loadingTextElement.textContent = loadingStates[stateIndex];
-                    loadingTextElement.style.opacity = '1';
-                }, 300);
-            }, 2000);
-        };
-        
-        const showToast = (message, type = 'success') => {
-            const toast = document.createElement('div');
-            const isSuccess = type === 'success';
-
-            const successIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>`;
-            const errorIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>`;
-            
-            toast.className = `w-full flex items-center gap-3 p-3 rounded-lg shadow-lg bg-[#2a2a4e] border ${isSuccess ? 'border-green-500/30' : 'border-red-500/30'} toast-in`;
-            toast.innerHTML = `
-                <div class="flex-shrink-0">${isSuccess ? successIcon : errorIcon}</div>
-                <p class="flex-grow text-xs font-medium text-slate-200">${message}</p>
-            `;
-            
-            toastContainer.appendChild(toast);
-
-            setTimeout(() => {
-                toast.classList.remove('toast-in');
-                toast.classList.add('toast-out');
-                toast.addEventListener('animationend', () => {
-                    toast.remove();
-                });
-            }, 3000);
+            if(url) {
+                copyToClipboard(url, null, true);
+            }
         };
 
         const resetFileInput = () => {
              fileInput.value = null;
              selectedFileDiv.innerHTML = '';
              selectedFileDiv.classList.add('hidden');
-        };
+        }
         
         const updateFileInfo = () => {
-            loadingArea.innerHTML = '';
+            resultArea.innerHTML = '';
             const file = fileInput.files[0];
             selectedFileDiv.classList.toggle('hidden', !file);
             
@@ -256,7 +213,7 @@
                     <div class="flex items-center gap-2 p-2 bg-[#2a2a4e] rounded-md border border-[#4a4a6a]">
                         <div class="flex-shrink-0">${iconSVG}</div>
                         <div class="flex-grow overflow-hidden">
-                            <p class="text-slate-100 font-medium text-xs truncate" title="${file.name}">${file.name}</p>
+                            <p class="text-slate-100 font-medium text-xs truncate">${file.name}</p>
                             <p class="text-[10px] text-slate-400">${formatFileSize(file.size)}</p>
                         </div>
                         <button id="clearBtn" class="flex-shrink-0 text-slate-500 hover:text-white transition-colors" title="Clear selection">
@@ -269,14 +226,62 @@
         
         const setLoadingState = (isLoading) => {
             clearInterval(loadingInterval);
+            resultArea.innerHTML = '';
             uploadBtn.disabled = isLoading;
-            loadingArea.innerHTML = '';
             if (isLoading) {
+                uploadBtn.classList.add('animate-pulse');
                 uploadBtn.textContent = '...';
-                renderLoadingState();
             } else {
+                uploadBtn.classList.remove('animate-pulse');
                 uploadBtn.textContent = 'Upload';
             }
+        };
+
+        const showToast = (message, type = 'success') => {
+            clearTimeout(toastTimeout);
+            const existingToast = document.querySelector('.toast');
+            if (existingToast) {
+                existingToast.remove();
+            }
+
+            const toast = document.createElement('div');
+            toast.className = 'toast fixed top-4 right-4 p-3 rounded-md shadow-lg flex items-center gap-3 bg-[#1e1e3f] border z-50 w-max max-w-xs';
+            
+            const text = document.createElement('span');
+            text.className = 'text-xs font-semibold';
+            text.textContent = message;
+
+            let icon, borderColor;
+            if (type === 'success') {
+                borderColor = 'border-green-500/50';
+                text.classList.add('text-green-400');
+                icon = `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>`;
+            } else {
+                borderColor = 'border-red-500/50';
+                text.classList.add('text-red-400');
+                icon = `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-red-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>`;
+            }
+            toast.classList.add(borderColor);
+            toast.innerHTML = icon;
+            toast.appendChild(text);
+            document.body.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.add('show');
+            });
+
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 400);
+            }, 3000);
+        };
+
+        const copyToClipboard = (text, buttonElement, silent = false) => {
+            navigator.clipboard.writeText(text).then(() => {
+                if (!silent) {
+                    showToast('Link copied to clipboard!', 'success');
+                }
+            });
         };
         
         const generateFileHash = async (file) => {
