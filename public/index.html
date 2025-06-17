@@ -10,27 +10,31 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    
+
     <style>
         :root {
-            --bg-dark: #1a1a2e;
-            --bg-medium: #1e1e3f;
-            --bg-light: #2a2a4e;
+            --bg-dark-1: #1a1a2e;
+            --bg-dark-2: #1e1e3f;
+            --bg-dark-3: #2a2a4e;
             --border-color: #3a3a5a;
             --border-dashed: #4a4a6a;
             --text-light: #f0f0f0;
-            --text-medium: #slate-200;
-            --text-dark: #slate-400;
+            --text-muted: #a0aec0;
+            --text-dark: #1a1a2e;
             --accent-color: #ffc300;
+            --success-color: #48bb78;
+            --error-color: #f56565;
         }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
+
         body {
-            font-family: 'Poppins', system-ui, sans-serif;
-            background-color: var(--bg-dark);
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--bg-dark-1);
             color: var(--text-light);
             min-height: 100vh;
             display: flex;
@@ -42,12 +46,13 @@
                 linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
             background-size: 20px 20px;
         }
+
         main {
             width: 100%;
             max-width: 380px;
-            margin: 0 auto;
         }
-        .uploader-container {
+
+        .card {
             background-color: rgba(30, 30, 63, 0.8);
             backdrop-filter: blur(4px);
             border: 1px solid var(--border-color);
@@ -55,31 +60,37 @@
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
             overflow: hidden;
         }
-        .uploader-header {
+
+        .card-header {
             padding: 1rem;
             text-align: center;
             border-bottom: 1px solid var(--border-color);
         }
-        .uploader-header h2 {
+
+        .card-header h2 {
             font-size: 1.125rem;
             font-weight: 700;
-            letter-spacing: 0.025em;
+            letter-spacing: 0.05em;
         }
-        .uploader-header .title-highlight {
+        
+        .card-header .accent-text {
             color: var(--accent-color);
         }
-        .uploader-header p {
-            color: var(--text-dark);
-            margin-top: 0.125rem;
-            font-size: 0.75rem;
+
+        .card-header p {
+            color: var(--text-muted);
+            font-size: 0.7rem;
+            margin-top: 0.25rem;
         }
-        .uploader-body {
+
+        .card-body {
             padding: 1.25rem;
             display: flex;
             flex-direction: column;
             gap: 0.875rem;
         }
-        .file-input-label {
+
+        .drop-zone {
             position: relative;
             display: block;
             padding: 1.25rem;
@@ -88,249 +99,243 @@
             text-align: center;
             cursor: pointer;
             background-color: transparent;
-            transition: all 0.3s ease-in-out;
+            transition: all 0.3s ease;
         }
-        .file-input-label:hover {
+
+        .drop-zone:hover {
             border-color: var(--accent-color);
-            background-color: var(--bg-light);
+            background-color: var(--bg-dark-3);
         }
-        .file-input-label .label-content {
+
+        .drop-zone-content {
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             pointer-events: none;
         }
-        .file-input-label .label-content svg {
+
+        .drop-zone-icon {
             width: 2rem;
             height: 2rem;
-            margin: 0 auto 0.5rem;
             color: var(--accent-color);
+            margin-bottom: 0.5rem;
         }
-        .file-input-label .label-content .main-text {
+
+        .drop-zone-text {
             font-size: 0.875rem;
-            color: var(--text-medium);
-            font-weight: 600;
+            color: var(--text-light);
+            font-weight: 500;
         }
-        .file-input-label .label-content .main-text span {
+        
+        .drop-zone-text span {
             color: var(--accent-color);
         }
-        .file-input-label .label-content .sub-text {
-            display: block;
-            font-size: 0.625rem;
-            color: #64748b;
+
+        .drop-zone-subtext {
+            font-size: 0.65rem;
+            color: var(--text-muted);
             margin-top: 0.25rem;
         }
-        #fileInput {
+
+        .drop-zone input[type="file"] {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             opacity: 0;
             cursor: pointer;
         }
+        
         #selectedFile.hidden, #uploadProgress.hidden {
             display: none;
         }
-        #selectedFile .file-info-box {
+        
+        .selected-file-box {
             display: flex;
             align-items: center;
             gap: 0.75rem;
             padding: 0.5rem;
-            background-color: var(--bg-light);
-            border-radius: 0.375rem;
+            background-color: var(--bg-dark-3);
             border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
         }
-        #selectedFile .file-info-icon {
+
+        .selected-file-box .icon {
             flex-shrink: 0;
-        }
-        #selectedFile .file-info-icon svg {
             width: 1.125rem;
             height: 1.125rem;
-            color: var(--text-dark);
+            color: var(--text-muted);
         }
-        #selectedFile .file-info-details {
+
+        .selected-file-box .info {
             flex-grow: 1;
             overflow: hidden;
         }
-        #selectedFile .file-info-details p {
-            line-height: 1.4;
-        }
-        #selectedFile .file-name {
-            color: var(--text-light);
-            font-weight: 500;
+        
+        .selected-file-box .info p {
             font-size: 0.75rem;
+            font-weight: 500;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        #selectedFile .file-size {
-            font-size: 0.625rem;
-            color: var(--text-dark);
+
+        .selected-file-box .info span {
+            font-size: 0.65rem;
+            color: var(--text-muted);
         }
-        #selectedFile .clear-btn {
+        
+        .clear-btn {
             flex-shrink: 0;
             background: none;
             border: none;
-            color: #64748b;
+            color: var(--text-muted);
             cursor: pointer;
-            transition: color 0.2s;
+            transition: color 0.2s ease;
         }
-        #selectedFile .clear-btn:hover {
+        
+        .clear-btn:hover {
             color: var(--text-light);
         }
-        #selectedFile .clear-btn svg {
+
+        .clear-btn svg {
             width: 1rem;
             height: 1rem;
         }
-        #uploadProgress {
+        
+        .progress-bar-container {
             width: 100%;
-            background-color: var(--bg-light);
+            background-color: var(--bg-dark-3);
             border-radius: 9999px;
             height: 0.5rem;
             border: 1px solid var(--border-color);
             overflow: hidden;
         }
-        #progressBar {
+        
+        .progress-bar {
             background-color: var(--accent-color);
             height: 100%;
             border-radius: 9999px;
             transition: width 0.3s ease-in-out;
         }
-        #uploadBtn {
+
+        .upload-button {
             width: 100%;
             padding: 0.625rem 1rem;
             background-color: var(--accent-color);
+            border: none;
             border-radius: 0.375rem;
-            color: var(--bg-dark);
+            color: var(--text-dark);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             font-size: 0.75rem;
-            border: none;
             cursor: pointer;
-            transition: all 0.3s ease-in-out;
+            transition: all 0.3s ease;
         }
-        #uploadBtn:hover:not(:disabled) {
+        
+        .upload-button:hover:not(:disabled) {
             transform: scale(1.02);
             filter: brightness(1.05);
         }
-        #uploadBtn:disabled {
+        
+        .upload-button:disabled {
             opacity: 0.4;
             cursor: not-allowed;
-            transform: scale(1);
         }
-        #urlResult .result-box {
+        
+        #urlResult {
+            padding-top: 0.5rem;
+        }
+
+        .file-details-box {
             position: relative;
-            background-color: var(--bg-light);
+            background-color: var(--bg-dark-1);
             border: 1px solid var(--border-color);
             border-radius: 0.375rem;
             padding: 0.75rem;
             font-size: 0.75rem;
         }
-        #urlResult .result-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.5rem;
-        }
-        #urlResult .result-title {
-            font-weight: 600;
-            color: var(--accent-color);
-        }
-        #urlResult .result-actions {
+
+        .file-details-box .copy-btn {
             position: absolute;
             top: 0.5rem;
             right: 0.5rem;
-            display: flex;
-            gap: 0.5rem;
-        }
-        #urlResult .result-actions button {
             background: none;
             border: none;
+            color: var(--text-muted);
             cursor: pointer;
-            color: var(--text-dark);
-            transition: color 0.2s;
+            transition: color 0.2s ease;
         }
-        #urlResult .result-actions button:hover {
-            color: var(--text-light);
+        
+        .file-details-box .copy-btn:hover {
+            color: white;
         }
-        #urlResult .result-actions svg {
+        
+        .file-details-box .copy-btn svg {
             width: 1rem;
             height: 1rem;
         }
-        #urlResult .result-detail {
+        
+        .file-details-box .detail-row {
             display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding-top: 0.5rem;
-            border-top: 1px solid var(--border-color);
-            margin-top: 0.5rem;
+            justify-content: space-between;
+            padding: 0.25rem 0;
+            border-bottom: 1px solid var(--bg-dark-3);
         }
-        #urlResult .result-detail strong {
-            font-weight: 600;
-            color: var(--text-medium);
-            flex-shrink: 0;
-            width: 60px;
+        
+        .file-details-box .detail-row:last-child {
+            border-bottom: none;
         }
-        #urlResult .result-detail span {
-            color: var(--text-dark);
-            word-break: break-all;
-            font-size: 0.7rem;
+        
+        .file-details-box .detail-label {
+            font-weight: 500;
+            color: var(--text-muted);
         }
-        #urlResult .url-input {
-            width: 100%;
-            background-color: var(--bg-dark);
-            color: var(--text-dark);
-            border-radius: 0.25rem;
-            padding: 0.375rem 0.5rem;
-            border: 1px solid var(--border-color);
-            font-size: 0.7rem;
-            margin-top: 0.25rem;
+
+        .file-details-box .detail-value {
+            color: var(--text-light);
+            max-width: 60%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-align: right;
         }
-        #urlResult .url-input.hidden {
-            display: none;
-        }
-        #urlResult .error-box {
-             padding: 0.75rem;
-             background-color: rgba(220, 38, 38, 0.1);
-             border: 1px solid rgba(220, 38, 38, 0.3);
-             border-radius: 0.375rem;
-             font-size: 0.75rem;
-             text-align: center;
-             color: #f87171;
+
+        .file-details-box .detail-value.url {
+            color: var(--accent-color);
+            text-decoration: none;
         }
     </style>
 </head>
 <body>
 
     <main>
-        <div class="uploader-container">
-            <div class="uploader-header">
-                <h2><span class="title-highlight">Vioo</span> Uploader</h2>
+        <div class="card">
+            <div class="card-header">
+                <h2><span class="accent-text">Vioo</span> Uploader</h2>
                 <p>Upload, store, and share your files securely.</p>
             </div>
             
-            <div class="uploader-body">
-                <label for="fileInput" class="file-input-label">
-                    <div class="label-content">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <div class="card-body">
+                <label for="fileInput" class="drop-zone">
+                    <div class="drop-zone-content">
+                        <svg class="drop-zone-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
                         </svg>
-                        <span class="main-text">Drop a file here or <span>browse files</span></span>
-                        <span class="sub-text">Maximum file size: 50MB</span>
+                        <span class="drop-zone-text">Drop a file here or <span>browse files</span></span>
+                        <span class="drop-zone-subtext">Maximum file size: 50MB</span>
                     </div>
                     <input type="file" id="fileInput"/>
                 </label>
                 
                 <div id="selectedFile" class="hidden"></div>
                 
-                <div id="uploadProgress" class="hidden">
-                    <div id="progressBar"></div>
+                <div id="uploadProgress" class="progress-bar-container hidden">
+                    <div id="progressBar" class="progress-bar"></div>
                 </div>
 
-                <button id="uploadBtn">Upload</button>
+                <button id="uploadBtn" class="upload-button">Upload</button>
                 
                 <div id="urlResult"></div>
             </div>
@@ -343,7 +348,7 @@
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFreHRwdG91cmV6amNpdHFzbnZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxNTQwMzAsImV4cCI6MjA2NTczMDAzMH0.4jMdZVQIJ_mx8VDQqYL8mjsABuYc9gjLdvS4lI3PLDg';
         const BUCKET_NAME = 'vioo-uploader';
         const CUSTOM_DOMAIN = 'https://cdn.vioo.my.id';
-
+        
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         
         const fileInput = document.getElementById('fileInput');
@@ -353,20 +358,13 @@
         const uploadProgress = document.getElementById('uploadProgress');
         const progressBar = document.getElementById('progressBar');
 
-        const iconClasses = 'file-info-icon';
-        const fileIconsSVG = {
-            'pdf': `<div class="${iconClasses}"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg></div>`,
-            'image': `<div class="${iconClasses}"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg></div>`,
-            'video': `<div class="${iconClasses}"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 010 .656l-5.603 3.113a.375.375 0 01-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112z" /></svg></div>`,
-            'audio': `<div class="${iconClasses}"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V7.5A2.25 2.25 0 0013.5 6H5.25A2.25 2.25 0 003 8.25v8.25a2.25 2.25 0 002.25 2.25h3.841M15 18a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" /></svg></div>`,
-            'archive': `<div class="${iconClasses}"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg></div>`,
-            'code': `<div class="${iconClasses}"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" /></svg></div>`,
-            'default': `<div class="${iconClasses}"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg></div>`,
-        };
-        const fileTypeGroups = { 'png': 'image', 'jpg': 'image', 'jpeg': 'image', 'gif': 'image', 'svg': 'image', 'webp': 'image', 'mp4': 'video', 'mov': 'video', 'avi': 'video', 'mp3': 'audio', 'wav': 'audio', 'ogg': 'audio', 'zip': 'archive', 'rar': 'archive', '7z': 'archive', 'js': 'code', 'html': 'code', 'css': 'code', 'json': 'code', 'py': 'code', 'java': 'code', 'doc': 'pdf', 'docx': 'pdf', 'xls': 'pdf', 'xlsx': 'pdf', 'ppt': 'pdf', 'pptx': 'pdf' };
+        let fileToUpload = null;
+        let imageDimensions = null;
 
         const resetUI = () => {
             fileInput.value = null;
+            fileToUpload = null;
+            imageDimensions = null;
             selectedFileDiv.innerHTML = '';
             selectedFileDiv.classList.add('hidden');
             urlResult.innerHTML = '';
@@ -376,108 +374,140 @@
         };
 
         const uploadFile = async () => {
-            const file = fileInput.files[0];
-            if (!file) {
+            if (!fileToUpload) {
                 renderErrorMessage('Please select a file first.');
                 return;
             }
 
-            setLoadingState(true, 'Uploading...');
-            uploadProgress.classList.remove('hidden');
+            setLoadingState(true, 'Checking...');
+            urlResult.innerHTML = '';
+            uploadProgress.classList.add('hidden');
 
             try {
-                const fileExt = file.name.split('.').pop()?.toLowerCase() || 'unknown';
+                const fileHash = await generateFileHash(fileToUpload);
+                const checkResponse = await fetch('/check-hash', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fileHash }),
+                });
+
+                if (!checkResponse.ok) {
+                    const errorData = await checkResponse.json();
+                    throw new Error(errorData.error || 'Failed to check file.');
+                }
+                
+                const checkData = await checkResponse.json();
+
+                if (checkData.exists) {
+                    const existingUrl = `${CUSTOM_DOMAIN}/v/${checkData.path}`;
+                    renderSuccessMessage('File already exists!', fileToUpload, existingUrl, imageDimensions);
+                    setLoadingState(false);
+                    return;
+                }
+
+                setLoadingState(true, 'Uploading...');
+                uploadProgress.classList.remove('hidden');
+                
+                const fileExt = getFileExtension(fileToUpload.name);
                 const randomId = Math.random().toString(36).substring(2, 8);
                 const filePath = `${randomId}.${fileExt}`;
 
                 const { data, error } = await supabase.storage
                     .from(BUCKET_NAME)
-                    .upload(filePath, file, { 
+                    .upload(filePath, fileToUpload, { 
                         cacheControl: '3600',
                         upsert: false,
-                        contentType: file.type
+                        contentType: fileToUpload.type,
                     });
 
                 if (error) throw error;
                 
-                const customDomainUrl = `${CUSTOM_DOMAIN}/v/${filePath}`;
-                const fileDetails = {
-                    name: file.name,
-                    size: file.size,
-                    type: file.type,
-                    url: customDomainUrl
-                };
-                renderSuccessMessage(fileDetails);
-                fileInput.value = null;
+                await fetch('/record-upload', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fileHash, filePath }),
+                });
+                
+                const newUrl = `${CUSTOM_DOMAIN}/v/${filePath}`;
+                renderSuccessMessage('Upload Successful!', fileToUpload, newUrl, imageDimensions);
 
             } catch (error) {
                 renderErrorMessage(error.message);
             } finally {
                 setLoadingState(false);
+                uploadProgress.classList.add('hidden');
             }
         };
         
-        const renderSuccessMessage = (fileDetails) => {
-            uploadProgress.classList.add('hidden');
+        const renderSuccessMessage = (title, file, url, dimensions) => {
+            const details = {
+                'Filename': file.name,
+                'Size': formatFileSize(file.size),
+                'Type': file.type || 'N/A',
+                ...(dimensions && { 'Dimensions': `${dimensions.width} x ${dimensions.height}px` }),
+                'URL': `<a href="${url}" target="_blank" class="detail-value url">View File</a>`
+            };
+
+            let detailsHtml = '';
+            for (const [key, value] of Object.entries(details)) {
+                detailsHtml += `
+                    <div class="detail-row">
+                        <span class="detail-label">${key}</span>
+                        <span class="detail-value">${value}</span>
+                    </div>
+                `;
+            }
+
             urlResult.innerHTML = `
-                <div class="result-box">
-                    <div class="result-header">
-                        <span class="result-title">Upload Successful</span>
-                        <div class="result-actions">
-                             <button id="toggleUrlBtn" title="Show/Hide URL">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" /><path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 010-1.18l.88-1.84a1.65 1.65 0 011.695-1.075H16.76a1.65 1.65 0 011.696 1.075l.88 1.84a1.651 1.651 0 010 1.18l-.88 1.842a1.65 1.65 0 01-1.695 1.075H3.24a1.65 1.65 0 01-1.695-1.075L.664 10.59zM17 10a7 7 0 11-14 0 7 7 0 0114 0z" clip-rule="evenodd" /></svg>
-                            </button>
-                            <button id="copyBtn" title="Copy URL">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM5 11a1 1 0 100 2h4a1 1 0 100-2H5z" /><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3 1h10a1 1 0 011 1v8a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z" clip-rule="evenodd" /></svg>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="result-detail"><strong>Name:</strong> <span>${fileDetails.name}</span></div>
-                    <div class="result-detail"><strong>Size:</strong> <span>${formatFileSize(fileDetails.size)}</span></div>
-                    <div class="result-detail"><strong>Type:</strong> <span>${fileDetails.type}</span></div>
-                    <div class="result-detail">
-                        <strong>URL:</strong>
-                        <input readonly id="urlInput" value="${fileDetails.url}" class="url-input hidden">
-                    </div>
+                <div class="file-details-box">
+                    <button class="copy-btn" title="Copy link">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM5 11a1 1 0 100 2h4a1 1 0 100-2H5z"></path><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3 1h10a1 1 0 011 1v8a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z" clip-rule="evenodd"></path></svg>
+                    </button>
+                    ${detailsHtml}
                 </div>`;
-            
-            document.getElementById('copyBtn').addEventListener('click', (e) => copyToClipboard(fileDetails.url, e.currentTarget));
-            document.getElementById('toggleUrlBtn').addEventListener('click', () => {
-                document.getElementById('urlInput').classList.toggle('hidden');
-            });
+            urlResult.querySelector('.copy-btn').addEventListener('click', (e) => copyToClipboard(url, e.currentTarget));
         };
         
         const renderErrorMessage = (message) => {
-            uploadProgress.classList.add('hidden');
-            urlResult.innerHTML = `<div class="error-box">${message}</div>`;
+            urlResult.innerHTML = `<div style="text-align:center; padding:0.5rem; background-color: rgba(245, 101, 101, 0.1); border: 1px solid rgba(245, 101, 101, 0.3); border-radius: 0.375rem; font-size: 0.75rem; color: var(--error-color);">${message}</div>`;
         };
         
-        const updateFileInfo = () => {
-            const file = fileInput.files[0];
-            selectedFileDiv.classList.toggle('hidden', !file);
-            urlResult.innerHTML = '';
-            uploadProgress.classList.add('hidden');
+        const handleFileSelection = (file) => {
+            resetUI();
+            if (!file) return;
             
-            if (file) {
-                const fileExt = file.name.split('.').pop()?.toLowerCase() || 'default';
-                const group = fileTypeGroups[fileExt] || 'default';
-                const iconSVG = fileIconsSVG[group] || fileIconsSVG['default'];
+            fileToUpload = file;
+            selectedFileDiv.classList.remove('hidden');
 
-                selectedFileDiv.innerHTML = `
-                    <div class="file-info-box">
-                        ${iconSVG}
-                        <div class="file-info-details">
-                            <p class="file-name">${file.name}</p>
-                            <p class="file-size">${formatFileSize(file.size)}</p>
-                        </div>
-                        <button class="clear-btn" id="clearBtn" title="Clear selection">
-                            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg>
-                        </button>
-                    </div>`;
-                document.getElementById('clearBtn').addEventListener('click', resetUI);
+            const fileExt = getFileExtension(file.name);
+            const iconSVG = `<svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>`;
+
+            selectedFileDiv.innerHTML = `
+                <div class="selected-file-box">
+                    <div class="icon">${iconSVG}</div>
+                    <div class="info">
+                        <p>${file.name}</p>
+                        <span>${formatFileSize(file.size)}</span>
+                    </div>
+                    <button id="clearBtn" class="clear-btn" title="Clear selection">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg>
+                    </button>
+                </div>`;
+            document.getElementById('clearBtn').addEventListener('click', resetUI);
+
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        imageDimensions = { width: img.naturalWidth, height: img.naturalHeight };
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
             }
         };
-        
+
         const setLoadingState = (isLoading, text = 'Uploading...') => {
             uploadBtn.disabled = isLoading;
             uploadBtn.textContent = isLoading ? text : 'Upload';
@@ -485,7 +515,7 @@
 
         const copyToClipboard = (text, buttonElement) => {
             const originalIcon = buttonElement.innerHTML;
-            const successIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>`;
+            const successIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" style="color: var(--success-color);" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>`;
             navigator.clipboard.writeText(text).then(() => {
                 buttonElement.innerHTML = successIcon;
                 setTimeout(() => { buttonElement.innerHTML = originalIcon; }, 2000);
@@ -506,32 +536,13 @@
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
         };
+        
+        const getFileExtension = (filename) => {
+            return filename.slice((filename.lastIndexOf(".") - 1 >>> 0) + 2).toLowerCase();
+        };
 
         uploadBtn.addEventListener('click', uploadFile);
-        fileInput.addEventListener('change', updateFileInfo);
-        
-        const label = document.querySelector('.file-input-label');
-        ['dragenter', 'dragover'].forEach(eventName => {
-            label.addEventListener(eventName, (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                label.style.borderColor = 'var(--accent-color)';
-                label.style.backgroundColor = 'var(--bg-light)';
-            }, false);
-        });
-        ['dragleave', 'drop'].forEach(eventName => {
-            label.addEventListener(eventName, (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                label.style.borderColor = '';
-                label.style.backgroundColor = '';
-            }, false);
-        });
-
-        label.addEventListener('drop', e => {
-            fileInput.files = e.dataTransfer.files;
-            updateFileInfo();
-        }, false);
+        fileInput.addEventListener('change', (e) => handleFileSelection(e.target.files[0]));
     });
     </script>
 </body>
