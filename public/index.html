@@ -4,12 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vioo Uploader</title>
-
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-
+    
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.css" rel="stylesheet" />
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -35,13 +36,18 @@
             transform: translateX(0);
         }
         pre[class*="language-"] {
-            @apply rounded-md text-[13px];
+            @apply rounded-b-md text-[13px] border-x border-b border-[#3a3a5a];
+            background: #1a1a2e !important;
+        }
+        .line-numbers .line-numbers-rows {
+            border-right-color: #3a3a5a !important;
+            background: #1e1e3f !important;
         }
     </style>
 </head>
 <body class="text-[#f0f0f0] min-h-screen flex items-center justify-center p-4">
 
-    <div class="w-full max-w-md mx-auto space-y-6">
+    <div class="w-full max-w-md mx-auto space-y-4">
         <main>
             <div class="bg-[#1e1e3f]/80 backdrop-blur-sm border border-[#3a3a5a] rounded-lg shadow-2xl shadow-black/50 overflow-hidden">
                 <div class="p-5 text-center border-b border-[#3a3a5a]">
@@ -74,16 +80,23 @@
 
         <section id="api-docs">
             <div class="bg-[#1e1e3f]/80 backdrop-blur-sm border border-[#3a3a5a] rounded-lg shadow-2xl shadow-black/50 overflow-hidden">
-                <div class="p-4 border-b border-[#3a3a5a]">
+                <button id="api-toggle-button" class="w-full flex justify-between items-center p-4">
                     <h3 class="font-semibold text-sm">API Usage</h3>
-                </div>
-                <div class="p-4">
-                    <p class="text-xs text-slate-300 mb-3">Upload files programmatically via a POST request to the <code class="bg-black/20 text-sky-400 text-[11px] py-0.5 px-1 rounded">/upload</code> endpoint.</p>
-                    <div class="relative">
-                        <button id="copy-api-code" class="absolute top-2 right-2 text-slate-400 hover:text-white transition-colors" title="Copy Code">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM5 11a1 1 0 100 2h4a1 1 0 100-2H5z"></path><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3 1h10a1 1 0 011 1v8a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z" clip-rule="evenodd"></path></svg>
-                        </button>
-                        <pre id="api-code-block" class="!my-0"><code class="language-js">const fileInput = document.querySelector('input[type="file"]');
+                    <svg id="api-toggle-icon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400 transition-transform duration-300" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                <div id="api-collapsible-content" class="hidden">
+                    <div class="px-4 pb-4">
+                        <p class="text-xs text-slate-300 mb-3">Upload files programmatically via a POST request to the <code class="bg-black/20 text-sky-400 text-[11px] py-0.5 px-1 rounded">/upload</code> endpoint.</p>
+                        <div class="bg-[#2a2a4e]/50 rounded-md overflow-hidden border border-[#3a3a5a]">
+                            <div class="flex justify-between items-center bg-[#1a1a2e] px-4 py-1.5 border-b border-[#3a3a5a]">
+                                <span class="text-slate-300 text-xs font-medium">JavaScript Example (Fetch API)</span>
+                                <button id="copy-api-code" class="text-slate-400 hover:text-white transition-colors" title="Copy Code">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM5 11a1 1 0 100 2h4a1 1 0 100-2H5z"></path><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3 1h10a1 1 0 011 1v8a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z" clip-rule="evenodd"></path></svg>
+                                </button>
+                            </div>
+                            <pre id="api-code-block" class="!my-0 !p-4 line-numbers"><code class="language-js">const fileInput = document.querySelector('input[type="file"]');
 const formData = new FormData();
 formData.append('file', fileInput.files[0]);
 
@@ -102,6 +115,7 @@ fetch('https://cdn.vioo.my.id/upload', {
 .catch(error => {
   console.error('Network Error:', error);
 });</code></pre>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -110,6 +124,7 @@ fetch('https://cdn.vioo.my.id/upload', {
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
     <script>
     document.addEventListener('DOMContentLoaded', () => {
         const SUPABASE_URL = 'https://qkxtptourezjcitqsnvv.supabase.co';
@@ -125,6 +140,9 @@ fetch('https://cdn.vioo.my.id/upload', {
         const selectedFileDiv = document.getElementById('selectedFile');
         const fileInputLabel = document.querySelector('.file-input-label');
         const copyApiCodeBtn = document.getElementById('copy-api-code');
+        const apiToggleButton = document.getElementById('api-toggle-button');
+        const apiToggleIcon = document.getElementById('api-toggle-icon');
+        const apiCollapsibleContent = document.getElementById('api-collapsible-content');
 
         let loadingInterval;
         let toastTimeout;
@@ -406,6 +424,17 @@ fetch('https://cdn.vioo.my.id/upload', {
                     button.innerHTML = originalIcon;
                 }, 2000);
             });
+        });
+
+        apiToggleButton.addEventListener('click', () => {
+            const isHidden = apiCollapsibleContent.classList.contains('hidden');
+            if (isHidden) {
+                apiCollapsibleContent.classList.remove('hidden');
+                apiToggleIcon.classList.add('rotate-180');
+            } else {
+                apiCollapsibleContent.classList.add('hidden');
+                apiToggleIcon.classList.remove('rotate-180');
+            }
         });
     });
     </script>
