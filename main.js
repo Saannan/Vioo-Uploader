@@ -19,6 +19,13 @@ const upload = multer({ storage: storage });
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
+app.get('/upload', (req, res) => {
+    res.status(405).json({
+        error: 'Method Not Allowed',
+        message: 'This endpoint only accepts POST requests to upload files.'
+    });
+});
+
 app.post('/upload', upload.single('file'), async (req, res) => {
     if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded.' });
