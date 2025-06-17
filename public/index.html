@@ -9,11 +9,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css" rel="stylesheet" />
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.css" rel="stylesheet" />
-
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/9000.0.1/themes/prism-okaidia.min.css" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/9000.0.1/plugins/line-numbers/prism-line-numbers.min.css" rel="stylesheet" />
 
     <style type="text/tailwindcss">
         @layer base {
@@ -35,96 +35,124 @@
         .toast.show {
             transform: translateX(0);
         }
-        pre[class*="language-"] {
-            @apply rounded-b-md text-[13px] border-x border-b border-[#3a3a5a];
-            background: #1a1a2e !important;
+        pre[class*="language-"].line-numbers {
+            position: relative;
+            padding-left: 3.8em;
+            counter-reset: start;
         }
-        .line-numbers .line-numbers-rows {
-            border-right-color: #3a3a5a !important;
-            background: #1e1e3f !important;
+        pre[class*="language-"] {
+            background: #1a1a2e;
+            border-radius: 0 0 0.5rem 0.5rem;
+            border: 1px solid #3a3a5a;
+            border-top: none;
+        }
+        .code-container-body {
+            display: grid;
+            grid-template-rows: 1fr;
+            transition: grid-template-rows 0.3s ease-in-out;
+        }
+        .code-container-body.hidden {
+            grid-template-rows: 0fr;
+        }
+        .code-container-body > div {
+            overflow: hidden;
+        }
+        #toggleApiIcon {
+            transition: transform 0.3s ease-in-out;
         }
     </style>
 </head>
 <body class="text-[#f0f0f0] min-h-screen flex items-center justify-center p-4">
 
-    <div class="w-full max-w-md mx-auto space-y-4">
-        <main>
-            <div class="bg-[#1e1e3f]/80 backdrop-blur-sm border border-[#3a3a5a] rounded-lg shadow-2xl shadow-black/50 overflow-hidden">
-                <div class="p-5 text-center border-b border-[#3a3a5a]">
-                    <h2 class="text-lg font-bold tracking-wide">
-                        <span class="text-[#ffc300]">Vioo</span> Uploader
-                    </h2>
-                    <p class="text-slate-400 mt-1 text-[11px]">Upload, store, and share your files securely.</p>
-                </div>
-                <div class="p-5 space-y-3">
-                    <label for="fileInput" class="file-input-label relative block p-5 border-2 border-dashed border-[#4a4a6a] rounded-md text-center cursor-pointer bg-transparent transition-all duration-300 hover:border-[#ffc300] hover:bg-[#2a2a4e]">
-                        <div class="flex flex-col items-center justify-center pointer-events-none">
-                            <svg class="w-7 h-7 mx-auto text-[#ffc300] mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                               <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
-                            </svg>
-                            <span class="text-xs text-slate-200 font-semibold">Drop a file here or <span class="text-[#ffc300]">browse files</span></span>
-                            <span class="block text-[10px] text-slate-500 mt-1">Maximum file size: 50MB</span>
-                        </div>
-                        <input type="file" id="fileInput" class="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer"/>
-                    </label>
-                    <div id="selectedFile" class="hidden"></div>
-                    <div>
-                         <button id="uploadBtn" class="w-full py-2 px-4 bg-[#ffc300] rounded-md text-[#1a1a2e] font-bold uppercase tracking-wider text-xs transition-all duration-300 ease-in-out transform hover:scale-[1.02] hover:brightness-105 focus:outline-none focus:ring-4 focus:ring-[#ffc300]/50 disabled:opacity-40 disabled:cursor-not-allowed disabled:scale-100 disabled:brightness-100">
-                            Upload
-                        </button>
+    <main class="w-full max-w-md mx-auto space-y-6">
+        <div class="bg-[#1e1e3f]/80 backdrop-blur-sm border border-[#3a3a5a] rounded-lg shadow-2xl shadow-black/50 overflow-hidden">
+            <div class="p-5 text-center border-b border-[#3a3a5a]">
+                <h2 class="text-lg font-bold tracking-wide">
+                    <span class="text-[#ffc300]">Vioo</span> Uploader
+                </h2>
+                <p class="text-slate-400 mt-1 text-[11px]">Upload, store, and share your files securely.</p>
+            </div>
+            
+            <div class="p-5 space-y-3">
+                <label for="fileInput" class="file-input-label relative block p-5 border-2 border-dashed border-[#4a4a6a] rounded-md text-center cursor-pointer bg-transparent transition-all duration-300 hover:border-[#ffc300] hover:bg-[#2a2a4e]">
+                    <div class="flex flex-col items-center justify-center pointer-events-none">
+                        <svg class="w-7 h-7 mx-auto text-[#ffc300] mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                           <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+                        </svg>
+                        <span class="text-xs text-slate-200 font-semibold">Drop a file here or <span class="text-[#ffc300]">browse files</span></span>
+                        <span class="block text-[10px] text-slate-500 mt-1">Maximum file size: 50MB</span>
                     </div>
-                    <div id="resultArea" class="pt-2"></div>
+                    <input type="file" id="fileInput" class="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer"/>
+                </label>
+                
+                <div id="selectedFile" class="hidden"></div>
+                
+                <div>
+                     <button id="uploadBtn" class="w-full py-2 px-4 bg-[#ffc300] rounded-md text-[#1a1a2e] font-bold uppercase tracking-wider text-xs transition-all duration-300 ease-in-out transform hover:scale-[1.02] hover:brightness-105 focus:outline-none focus:ring-4 focus:ring-[#ffc300]/50 disabled:opacity-40 disabled:cursor-not-allowed disabled:scale-100 disabled:brightness-100">
+                        Upload
+                    </button>
+                </div>
+                
+                <div id="resultArea" class="pt-2"></div>
+            </div>
+        </div>
+
+        <div id="apiDocs" class="bg-[#1e1e3f]/80 backdrop-blur-sm border border-[#3a3a5a] rounded-lg shadow-2xl shadow-black/50 overflow-hidden">
+            <div id="apiDocsHeader" class="flex justify-between items-center p-3 cursor-pointer select-none border-b border-[#3a3a5a]">
+                <div class="flex items-center gap-3">
+                     <svg class="w-5 h-5 text-[#ffc300]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5" />
+                    </svg>
+                    <h3 class="font-bold text-sm text-slate-200">API Usage</h3>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button id="copyApiBtn" class="text-slate-400 hover:text-white transition-colors" title="Copy Code">
+                        <span id="copyApiIcon">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v11.25c0 .966-.784 1.75-1.75 1.75H7.5a1.75 1.75 0 0 1-1.75-1.75V4.5c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.25c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" />
+                            </svg>
+                        </span>
+                    </button>
+                    <div id="toggleApiIcon">
+                        <svg class="w-5 h-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                           <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                        </svg>
+                    </div>
                 </div>
             </div>
-        </main>
+            <div id="apiDocsBody" class="code-container-body">
+                <div>
+<pre class="line-numbers"><code id="apiCode" class="language-js">
+const fileInput = document.querySelector('input[type="file"]');
+const myFile = fileInput.files[0];
 
-        <section id="api-docs">
-            <div class="bg-[#1e1e3f]/80 backdrop-blur-sm border border-[#3a3a5a] rounded-lg shadow-2xl shadow-black/50 overflow-hidden">
-                <button id="api-toggle-button" class="w-full flex justify-between items-center p-4">
-                    <h3 class="font-semibold text-sm">API Usage</h3>
-                    <svg id="api-toggle-icon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400 transition-transform duration-300" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                    </svg>
-                </button>
-                <div id="api-collapsible-content" class="hidden">
-                    <div class="px-4 pb-4">
-                        <p class="text-xs text-slate-300 mb-3">Upload files programmatically via a POST request to the <code class="bg-black/20 text-sky-400 text-[11px] py-0.5 px-1 rounded">/upload</code> endpoint.</p>
-                        <div class="bg-[#2a2a4e]/50 rounded-md overflow-hidden border border-[#3a3a5a]">
-                            <div class="flex justify-between items-center bg-[#1a1a2e] px-4 py-1.5 border-b border-[#3a3a5a]">
-                                <span class="text-slate-300 text-xs font-medium">JavaScript Example (Fetch API)</span>
-                                <button id="copy-api-code" class="text-slate-400 hover:text-white transition-colors" title="Copy Code">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM5 11a1 1 0 100 2h4a1 1 0 100-2H5z"></path><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3 1h10a1 1 0 011 1v8a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z" clip-rule="evenodd"></path></svg>
-                                </button>
-                            </div>
-                            <pre id="api-code-block" class="!my-0 !p-4 line-numbers"><code class="language-js">const fileInput = document.querySelector('input[type="file"]');
 const formData = new FormData();
-formData.append('file', fileInput.files[0]);
+formData.append('file', myFile);
 
-fetch('https://cdn.vioo.my.id/upload', {
-  method: 'POST',
-  body: formData,
+fetch('/upload', {
+    method: 'POST',
+    body: formData
 })
 .then(response => response.json())
 .then(data => {
-  if (data.success) {
-    console.log('File URL:', data.url);
-  } else {
-    console.error('Error:', data.error);
-  }
+    if(data.success) {
+        console.log('File URL:', data.url);
+    } else {
+        console.error('Upload failed:', data.error);
+    }
 })
 .catch(error => {
-  console.error('Network Error:', error);
-});</code></pre>
-                        </div>
-                    </div>
+    console.error('Error:', error);
+});
+</code></pre>
                 </div>
             </div>
-        </section>
-    </div>
+        </div>
+    </main>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/9000.0.1/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/9000.0.1/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/9000.0.1/plugins/line-numbers/prism-line-numbers.min.js"></script>
     <script>
     document.addEventListener('DOMContentLoaded', () => {
         const SUPABASE_URL = 'https://qkxtptourezjcitqsnvv.supabase.co';
@@ -139,10 +167,6 @@ fetch('https://cdn.vioo.my.id/upload', {
         const resultArea = document.getElementById('resultArea');
         const selectedFileDiv = document.getElementById('selectedFile');
         const fileInputLabel = document.querySelector('.file-input-label');
-        const copyApiCodeBtn = document.getElementById('copy-api-code');
-        const apiToggleButton = document.getElementById('api-toggle-button');
-        const apiToggleIcon = document.getElementById('api-toggle-icon');
-        const apiCollapsibleContent = document.getElementById('api-collapsible-content');
 
         let loadingInterval;
         let toastTimeout;
@@ -195,6 +219,7 @@ fetch('https://cdn.vioo.my.id/upload', {
                     const existingUrl = `${CUSTOM_DOMAIN}/v/${checkData.path}`;
                     showToast('File already exists!', 'success');
                     renderDetailCard(file, existingUrl);
+                    setLoadingState(false);
                     return;
                 }
                 
@@ -371,6 +396,8 @@ fetch('https://cdn.vioo.my.id/upload', {
                         buttonElement.innerHTML = originalIcon;
                     }, 2000);
                 });
+            } else {
+                 navigator.clipboard.writeText(text);
             }
         };
         
@@ -412,29 +439,30 @@ fetch('https://cdn.vioo.my.id/upload', {
             updateFileInfo();
             uploadFile();
         }, false);
-        
-        copyApiCodeBtn.addEventListener('click', (e) => {
-            const codeToCopy = document.getElementById('api-code-block').textContent;
-            const button = e.currentTarget;
-            const originalIcon = button.innerHTML;
-            const successIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>`;
-            navigator.clipboard.writeText(codeToCopy).then(() => {
-                button.innerHTML = successIcon;
-                setTimeout(() => {
-                    button.innerHTML = originalIcon;
-                }, 2000);
-            });
+
+        const apiDocsHeader = document.getElementById('apiDocsHeader');
+        const apiDocsBody = document.getElementById('apiDocsBody');
+        const toggleApiIcon = document.getElementById('toggleApiIcon');
+        apiDocsHeader.addEventListener('click', () => {
+            const isHidden = apiDocsBody.classList.contains('hidden');
+            apiDocsBody.classList.toggle('hidden');
+            toggleApiIcon.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(-180deg)';
         });
 
-        apiToggleButton.addEventListener('click', () => {
-            const isHidden = apiCollapsibleContent.classList.contains('hidden');
-            if (isHidden) {
-                apiCollapsibleContent.classList.remove('hidden');
-                apiToggleIcon.classList.add('rotate-180');
-            } else {
-                apiCollapsibleContent.classList.add('hidden');
-                apiToggleIcon.classList.remove('rotate-180');
-            }
+        const copyApiBtn = document.getElementById('copyApiBtn');
+        copyApiBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const codeToCopy = document.getElementById('apiCode').textContent;
+            const copyIconSpan = document.getElementById('copyApiIcon');
+            const originalIcon = copyIconSpan.innerHTML;
+            const successIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-green-400" viewBox="0 0 24 24" fill="currentColor"><path d="M9.5 18.5l-5-5L6 12l3.5 3.5L18 7l1.5 1.5l-10 10z"/></svg>`;
+            
+            navigator.clipboard.writeText(codeToCopy.trim()).then(() => {
+                copyIconSpan.innerHTML = successIcon;
+                setTimeout(() => {
+                    copyIconSpan.innerHTML = originalIcon;
+                }, 2000);
+            });
         });
     });
     </script>
