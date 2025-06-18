@@ -28,15 +28,11 @@
         .toast.show {
             transform: translateX(0);
         }
-        .modal-overlay {
-            transition: opacity 0.3s ease-in-out;
+        .modal {
+            transition: opacity 0.3s ease, transform 0.3s ease;
         }
         .modal-content {
-            transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
-            transform: translateY(20px) scale(0.95);
-        }
-        .modal.active .modal-content {
-            transform: translateY(0) scale(1);
+             transition: transform 0.3s ease;
         }
     </style>
 </head>
@@ -78,22 +74,21 @@
         </svg>
     </button>
     
-    <div id="modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
-        <div id="modal-overlay" class="modal-overlay absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
-        <div class="modal-content relative bg-[#1e1e3f] border border-[#3a3a5a] rounded-lg shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col opacity-100">
-            <div class="p-4 border-b border-[#4a4a6a] flex justify-between items-center">
-                <h3 class="text-lg font-semibold">File Management</h3>
-                <button id="modal-close-btn" class="text-slate-400 hover:text-white">&times;</button>
+    <div id="managementModal" class="modal fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 opacity-0 pointer-events-none -z-10">
+        <div class="modal-content w-full max-w-2xl bg-[#1e1e3f] border border-[#3a3a5a] rounded-lg shadow-2xl transform scale-95">
+            <div class="flex justify-between items-center p-4 border-b border-[#3a3a5a]">
+                <h3 class="text-lg font-semibold text-slate-100">File Manager</h3>
+                <button id="closeModalBtn" class="text-slate-400 hover:text-white">&times;</button>
             </div>
-            <div class="p-4 border-b border-[#4a4a6a]">
-                <div class="flex space-x-1 bg-[#1a1a2e] p-1 rounded-md">
-                    <button data-tab="management" class="tab-btn flex-1 py-1 px-2 text-xs font-semibold rounded-md transition-colors bg-[#ffc300] text-[#1a1a2e]">Manage Files</button>
-                    <button data-tab="history" class="tab-btn flex-1 py-1 px-2 text-xs font-semibold rounded-md transition-colors text-slate-300">Upload History</button>
+            <div class="p-4">
+                <div class="border-b border-[#3a3a5a]">
+                    <nav class="flex space-x-4" aria-label="Tabs">
+                        <button id="myFilesTab" class="tab-btn text-[#ffc300] border-b-2 border-[#ffc300] px-3 py-2 text-sm font-medium">My Files</button>
+                        <button id="historyTab" class="tab-btn text-slate-400 hover:text-slate-200 px-3 py-2 text-sm font-medium">Upload History</button>
+                    </nav>
                 </div>
-            </div>
-            <div class="flex-grow overflow-y-auto p-4 space-y-3">
-                <div id="management-tab" class="tab-content"></div>
-                <div id="history-tab" class="tab-content hidden"></div>
+                <div id="myFilesContent" class="tab-content mt-4 max-h-[60vh] overflow-y-auto"></div>
+                <div id="historyContent" class="tab-content mt-4 max-h-[60vh] overflow-y-auto hidden"></div>
             </div>
         </div>
     </div>
@@ -105,254 +100,48 @@
         const resultArea = document.getElementById('resultArea');
         const selectedFileDiv = document.getElementById('selectedFile');
         const fileInputLabel = document.querySelector('.file-input-label');
+        const fab = document.getElementById('fab');
+        const modal = document.getElementById('managementModal');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const myFilesTab = document.getElementById('myFilesTab');
+        const historyTab = document.getElementById('historyTab');
+        const myFilesContent = document.getElementById('myFilesContent');
+        const historyContent = document.getElementById('historyContent');
 
         let loadingInterval;
         let toastTimeout;
-        
-        let userFiles = [];
-        const fab = document.getElementById('fab');
-        const modal = document.getElementById('modal');
-        const modalOverlay = document.getElementById('modal-overlay');
-        const modalCloseBtn = document.getElementById('modal-close-btn');
-        const managementTab = document.getElementById('management-tab');
-        const historyTab = document.getElementById('history-tab');
-        const tabButtons = document.querySelectorAll('.tab-btn');
-
-        const loadFilesFromStorage = () => {
-            const storedFiles = localStorage.getItem('viooUserFiles');
-            if (storedFiles) {
-                userFiles = JSON.parse(storedFiles);
-            }
-        };
-
-        const saveFilesToStorage = () => {
-            localStorage.setItem('viooUserFiles', JSON.stringify(userFiles));
-        };
-        
-        const openModal = () => {
-            modal.classList.remove('hidden');
-            document.body.style.overflow = 'hidden';
-            renderManagementTab();
-            renderHistoryTab();
-        };
-
-        const closeModal = () => {
-            modal.classList.add('hidden');
-            document.body.style.overflow = 'auto';
-        };
-
-        const switchTab = (tabName) => {
-            tabButtons.forEach(btn => {
-                if (btn.dataset.tab === tabName) {
-                    btn.classList.add('bg-[#ffc300]', 'text-[#1a1a2e]');
-                    btn.classList.remove('text-slate-300');
-                } else {
-                    btn.classList.remove('bg-[#ffc300]', 'text-[#1a1a2e]');
-                    btn.classList.add('text-slate-300');
-                }
-            });
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.toggle('hidden', tab.id !== `${tabName}-tab`);
-            });
-        };
-
-        const renderManagementTab = () => {
-            if (userFiles.length === 0) {
-                managementTab.innerHTML = `<p class="text-center text-slate-400 text-sm">No files to manage. Upload a file first.</p>`;
-                return;
-            }
-            managementTab.innerHTML = userFiles.map(file => `
-                <div class="bg-[#2a2a4e]/60 p-3 rounded-md border border-[#4a4a6a] space-y-3">
-                    <div class="flex justify-between items-start">
-                        <div class="flex-grow overflow-hidden pr-4">
-                            <p class="font-semibold text-sm truncate" title="${file.name}">${file.name}</p>
-                            <p class="text-xs text-slate-400">${file.size} - ${file.date}</p>
-                        </div>
-                        <div class="flex-shrink-0 flex items-center gap-2">
-                             <button data-url="${file.url}" title="Copy Link" class="btn-copy-manage text-slate-400 hover:text-white transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM5 11a1 1 0 100 2h4a1 1 0 100-2H5z"></path><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3 1h10a1 1 0 011 1v8a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z" clip-rule="evenodd" /></svg></button>
-                            <button data-id="${file.id}" title="Delete File" class="btn-delete-file text-red-500 hover:text-red-400 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
-                        </div>
-                    </div>
-                    <div class="flex items-center justify-between text-xs gap-4">
-                        <div class="flex items-center gap-2">
-                            <label for="private-${file.id}" class="font-medium">Private</label>
-                            <input type="checkbox" id="private-${file.id}" data-id="${file.id}" class="input-private" ${file.is_private ? 'checked' : ''}>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <label for="expiry-${file.id}" class="font-medium">Expires</label>
-                            <select id="expiry-${file.id}" data-id="${file.id}" class="input-expiry bg-[#1a1a2e] border border-[#4a4a6a] rounded-md px-2 py-1 text-xs focus:ring-[#ffc300] focus:border-[#ffc300]">
-                                <option value="null" ${!file.expires_at ? 'selected' : ''}>Permanent</option>
-                                <option value="1h" ${calculateExpiryValue(file.expires_at) === '1h' ? 'selected' : ''}>1 Hour</option>
-                                <option value="6h" ${calculateExpiryValue(file.expires_at) === '6h' ? 'selected' : ''}>6 Hours</option>
-                                <option value="12h" ${calculateExpiryValue(file.expires_at) === '12h' ? 'selected' : ''}>12 Hours</option>
-                                <option value="1d" ${calculateExpiryValue(file.expires_at) === '1d' ? 'selected' : ''}>1 Day</option>
-                                <option value="7d" ${calculateExpiryValue(file.expires_at) === '7d' ? 'selected' : ''}>7 Days</option>
-                                <option value="30d" ${calculateExpiryValue(file.expires_at) === '30d' ? 'selected' : ''}>30 Days</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-            attachManagementListeners();
-        };
-        
-        const renderHistoryTab = () => {
-            if (userFiles.length === 0) {
-                historyTab.innerHTML = `<p class="text-center text-slate-400 text-sm">Your upload history is empty.</p>`;
-                return;
-            }
-            historyTab.innerHTML = userFiles.map(file => `
-                 <div class="bg-[#2a2a4e]/60 p-3 rounded-md border border-[#4a4a6a] flex justify-between items-center">
-                    <div class="flex-grow overflow-hidden pr-4">
-                        <p class="font-semibold text-sm truncate" title="${file.name}">${file.name}</p>
-                        <p class="text-xs text-slate-400">${file.size} - ${file.date}</p>
-                    </div>
-                    <button data-id="${file.id}" title="Remove from History" class="btn-delete-history flex-shrink-0 text-slate-400 hover:text-white transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></button>
-                 </div>
-            `).join('');
-            attachHistoryListeners();
-        };
-        
-        const attachManagementListeners = () => {
-            document.querySelectorAll('.btn-copy-manage').forEach(btn => btn.addEventListener('click', (e) => copyToClipboard(e.currentTarget.dataset.url, e.currentTarget)));
-            document.querySelectorAll('.btn-delete-file').forEach(btn => btn.addEventListener('click', (e) => handleDeleteFile(e.currentTarget.dataset.id)));
-            document.querySelectorAll('.input-private').forEach(input => input.addEventListener('change', (e) => handleUpdateFile(e.currentTarget.dataset.id)));
-            document.querySelectorAll('.input-expiry').forEach(select => select.addEventListener('change', (e) => handleUpdateFile(e.currentTarget.dataset.id)));
-        };
-        
-        const attachHistoryListeners = () => {
-            document.querySelectorAll('.btn-delete-history').forEach(btn => btn.addEventListener('click', (e) => handleDeleteHistory(e.currentTarget.dataset.id)));
-        };
-
-        const calculateExpiryValue = (isoString) => {
-            if (!isoString) return 'null';
-            const now = new Date();
-            const expiry = new Date(isoString);
-            const diffHours = (expiry - now) / (1000 * 60 * 60);
-            if (Math.round(diffHours) === 1) return '1h';
-            if (Math.round(diffHours) === 6) return '6h';
-            if (Math.round(diffHours) === 12) return '12h';
-            const diffDays = diffHours / 24;
-            if (Math.round(diffDays) === 1) return '1d';
-            if (Math.round(diffDays) === 7) return '7d';
-            if (Math.round(diffDays) === 30) return '30d';
-            return 'null';
-        };
-        
-        const getExpiryDateFromValue = (value) => {
-            if (value === 'null') return null;
-            const now = new Date();
-            const unit = value.slice(-1);
-            const amount = parseInt(value.slice(0, -1));
-            if (unit === 'h') {
-                now.setHours(now.getHours() + amount);
-            } else if (unit === 'd') {
-                now.setDate(now.getDate() + amount);
-            }
-            return now.toISOString();
-        };
-
-        const handleDeleteHistory = (fileId) => {
-            userFiles = userFiles.filter(f => f.id !== fileId);
-            saveFilesToStorage();
-            renderHistoryTab();
-            renderManagementTab();
-            showToast('Removed from history.', 'success');
-        };
-
-        const handleUpdateFile = async (fileId) => {
-            const is_private = document.getElementById(`private-${fileId}`).checked;
-            const expiryValue = document.getElementById(`expiry-${fileId}`).value;
-            const expires_at = getExpiryDateFromValue(expiryValue);
-            
-            try {
-                const response = await fetch(`/api/file/${fileId}/manage`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ is_private, expires_at })
-                });
-                const result = await response.json();
-                if (!result.success) throw new Error(result.error);
-                
-                const fileIndex = userFiles.findIndex(f => f.id === fileId);
-                if(fileIndex > -1) {
-                    userFiles[fileIndex].is_private = is_private;
-                    userFiles[fileIndex].expires_at = expires_at;
-                    saveFilesToStorage();
-                }
-                showToast('File updated!', 'success');
-            } catch (err) {
-                showToast(err.message, 'error');
-                renderManagementTab();
-            }
-        };
-
-        const handleDeleteFile = async (fileId) => {
-            if (!confirm('Are you sure you want to permanently delete this file? This action cannot be undone.')) return;
-            try {
-                const response = await fetch(`/api/file/${fileId}`, { method: 'DELETE' });
-                const result = await response.json();
-                if (!result.success) throw new Error(result.error);
-
-                userFiles = userFiles.filter(f => f.id !== fileId);
-                saveFilesToStorage();
-                renderManagementTab();
-                renderHistoryTab();
-                showToast('File permanently deleted.', 'success');
-            } catch (err) {
-                showToast(err.message, 'error');
-            }
-        };
-
-        const iconClasses = 'w-4 h-4 text-[#ffc300]';
-        const bigIconClasses = 'w-6 h-6 text-[#ffc300]';
-        const fileIconsSVG = {
-            'pdf': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>`,
-            'image': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>`,
-            'video': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 010 .656l-5.603 3.113a.375.375 0 01-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112z" /></svg>`,
-            'audio': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V7.5A2.25 2.25 0 0013.5 6H5.25A2.25 2.25 0 003 8.25v8.25a2.25 2.25 0 002.25 2.25h3.841M15 18a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" /></svg>`,
-            'archive': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>`,
-            'code': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" /></svg>`,
-            'default': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>`,
-        };
-        const bigFileIconsSVG = {
-             'pdf': `<svg class="${bigIconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>`,
-            'image': `<svg class="${bigIconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>`,
-            'video': `<svg class="${bigIconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 010 .656l-5.603 3.113a.375.375 0 01-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112z" /></svg>`,
-            'audio': `<svg class="${bigIconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V7.5A2.25 2.25 0 0013.5 6H5.25A2.25 2.25 0 003 8.25v8.25a2.25 2.25 0 002.25 2.25h3.841M15 18a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" /></svg>`,
-            'archive': `<svg class="${bigIconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>`,
-            'code': `<svg class="${bigIconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" /></svg>`,
-            'default': `<svg class="${bigIconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>`,
-        };
+        const VIOO_FILES_KEY = 'vioo_files';
         const fileTypeGroups = { 'png': 'image', 'jpg': 'image', 'jpeg': 'image', 'gif': 'image', 'svg': 'image', 'webp': 'image', 'mp4': 'video', 'mov': 'video', 'avi': 'video', 'mp3': 'audio', 'wav': 'audio', 'ogg': 'audio', 'zip': 'archive', 'rar': 'archive', '7z': 'archive', 'js': 'code', 'html': 'code', 'css': 'code', 'json': 'code', 'py': 'code', 'java': 'code', 'doc': 'pdf', 'docx': 'pdf', 'xls': 'pdf', 'xlsx': 'pdf', 'ppt': 'pdf', 'pptx': 'pdf' };
+        const iconClasses = 'w-4 h-4 text-[#ffc300]';
+        const fileIconsSVG = { 'pdf': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>`, 'image': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>`, 'video': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 010 .656l-5.603 3.113a.375.375 0 01-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112z" /></svg>`, 'audio': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V7.5A2.25 2.25 0 0013.5 6H5.25A2.25 2.25 0 003 8.25v8.25a2.25 2.25 0 002.25 2.25h3.841M15 18a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" /></svg>`, 'archive': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>`, 'code': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" /></svg>`, 'default': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>` };
+        
+        const getFiles = () => JSON.parse(localStorage.getItem(VIOO_FILES_KEY)) || [];
+        const saveFiles = (files) => localStorage.setItem(VIOO_FILES_KEY, JSON.stringify(files));
+
+        const addFileToHistory = (fileData) => {
+            const files = getFiles();
+            const existingIndex = files.findIndex(f => f.id === fileData.id);
+            if (existingIndex > -1) {
+                files[existingIndex] = fileData;
+            } else {
+                files.unshift(fileData);
+            }
+            saveFiles(files);
+        };
 
         const uploadFile = async () => {
             const file = fileInput.files[0];
-            if (!file) {
-                showToast('Please select a file first.', 'error');
-                return;
-            }
-
+            if (!file) { showToast('Please select a file first.', 'error'); return; }
             setLoadingState(true);
             const formData = new FormData();
             formData.append('file', file);
-
             try {
                 const response = await fetch('/upload', { method: 'POST', body: formData });
                 const result = await response.json();
-                if (!response.ok) throw new Error(result.data || result.error || 'Upload failed.');
-
-                const existingIndex = userFiles.findIndex(f => f.id === result.data.id);
-                if (existingIndex === -1) {
-                    userFiles.unshift(result.data);
-                } else {
-                    userFiles[existingIndex] = result.data;
-                }
-                saveFilesToStorage();
-                
+                if (!response.ok) { throw new Error(result.data || result.error || 'Upload failed.'); }
                 showToast(result.message || 'Upload Successful!', 'success');
+                addFileToHistory(result.data);
                 renderDetailCard(result.data);
-
             } catch (error) {
                 showToast(error.message, 'error');
                 resetFileInput();
@@ -360,29 +149,40 @@
                 setLoadingState(false);
             }
         };
-        
-        const renderLoadingState = () => {
-            const loadingStates = ["Checking file...", "Securing connection...", "Almost there...", "Uploading..."];
-            let stateIndex = 0;
-            resultArea.innerHTML = `<div class="flex items-center justify-center gap-3 p-4"><svg class="w-5 h-5 animate-spin text-[#ffc300]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span id="loadingText" class="text-xs text-slate-300 transition-opacity duration-300">${loadingStates[0]}</span></div>`;
-            const loadingTextElement = document.getElementById('loadingText');
-            if (!loadingTextElement) return;
-            loadingInterval = setInterval(() => {
-                stateIndex = (stateIndex + 1) % loadingStates.length;
-                loadingTextElement.style.opacity = '0';
-                setTimeout(() => {
-                    loadingTextElement.textContent = loadingStates[stateIndex];
-                    loadingTextElement.style.opacity = '1';
-                }, 300);
-            }, 1500);
-        };
 
         const renderDetailCard = (fileData) => {
             resetFileInput();
             const group = fileTypeGroups[fileData.extension] || 'default';
-            const iconSVG = bigFileIconsSVG[group] || bigFileIconsSVG['default'];
-            resultArea.innerHTML = `<div class="w-full text-left bg-[#2a2a4e]/50 border border-[#4a4a6a] rounded-md p-3 flex items-center gap-3 relative transition-all duration-300"><button class="btn-copy absolute top-2 right-2 text-slate-400 hover:text-white transition-colors" title="Copy link"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM5 11a1 1 0 100 2h4a1 1 0 100-2H5z"></path><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3 1h10a1 1 0 011 1v8a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z" clip-rule="evenodd"></path></svg></button><div class="flex-shrink-0">${iconSVG}</div><div class="flex-grow overflow-hidden"><p class="text-xs text-slate-100 font-semibold truncate" title="${fileData.name}">${fileData.name}</p><p class="text-[10px] text-slate-400">${fileData.size} - ${fileData.mimetype || 'unknown type'}</p></div></div>`;
+            const iconSVG = fileIconsSVG[group] || fileIconsSVG['default'];
+            resultArea.innerHTML = `
+                <div class="w-full text-left bg-[#2a2a4e]/50 border border-[#4a4a6a] rounded-md p-3 flex items-center gap-3 relative transition-all duration-300">
+                    <button class="btn-copy absolute top-2 right-2 text-slate-400 hover:text-white transition-colors" title="Copy link">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM5 11a1 1 0 100 2h4a1 1 0 100-2H5z"></path><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3 1h10a1 1 0 011 1v8a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z" clip-rule="evenodd"></path></svg>
+                    </button>
+                    <div class="flex-shrink-0">${iconSVG}</div>
+                    <div class="flex-grow overflow-hidden">
+                        <p class="text-xs text-slate-100 font-semibold truncate" title="${fileData.name}">${fileData.name}</p>
+                        <p class="text-[10px] text-slate-400">${fileData.size} - ${fileData.mimetype || 'unknown type'}</p>
+                    </div>
+                </div>`;
             resultArea.querySelector('.btn-copy').addEventListener('click', (e) => copyToClipboard(fileData.url, e.currentTarget));
+        };
+        
+        const setLoadingState = (isLoading) => {
+            clearInterval(loadingInterval);
+            uploadBtn.disabled = isLoading;
+            uploadBtn.textContent = isLoading ? '...' : 'Upload';
+            if (isLoading) { uploadBtn.classList.add('animate-pulse'); renderLoadingState(); }
+            else { uploadBtn.classList.remove('animate-pulse'); }
+        };
+
+        const renderLoadingState = () => {
+            const states = ["Checking file...", "Securing connection...", "Almost there...", "Uploading..."];
+            let idx = 0;
+            resultArea.innerHTML = `<div class="flex items-center justify-center gap-3 p-4"><svg class="w-5 h-5 animate-spin text-[#ffc300]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span id="loadingText" class="text-xs text-slate-300 transition-opacity duration-300">${states[0]}</span></div>`;
+            const textEl = document.getElementById('loadingText');
+            if (!textEl) return;
+            loadingInterval = setInterval(() => { idx = (idx + 1) % states.length; textEl.style.opacity = '0'; setTimeout(() => { textEl.textContent = states[idx]; textEl.style.opacity = '1'; }, 300); }, 1500);
         };
 
         const resetFileInput = () => {
@@ -390,77 +190,7 @@
              selectedFileDiv.innerHTML = '';
              selectedFileDiv.classList.add('hidden');
         };
-        
-        const updateFileInfo = () => {
-            resultArea.innerHTML = '';
-            const file = fileInput.files[0];
-            selectedFileDiv.classList.toggle('hidden', !file);
-            if (file) {
-                const fileExt = file.name.split('.').pop()?.toLowerCase() || 'default';
-                const group = fileTypeGroups[fileExt] || 'default';
-                const iconSVG = fileIconsSVG[group] || fileIconsSVG['default'];
-                selectedFileDiv.innerHTML = `<div class="flex items-center gap-2 p-2 bg-[#2a2a4e] rounded-md border border-[#4a4a6a]"><div class="flex-shrink-0">${iconSVG}</div><div class="flex-grow overflow-hidden"><p class="text-slate-100 font-medium text-xs truncate">${file.name}</p><p class="text-[10px] text-slate-400">${formatFileSize(file.size)}</p></div><button id="clearBtn" class="flex-shrink-0 text-slate-500 hover:text-white transition-colors" title="Clear selection"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg></button></div>`;
-                document.getElementById('clearBtn').addEventListener('click', resetFileInput);
-            }
-        };
-        
-        const setLoadingState = (isLoading) => {
-            clearInterval(loadingInterval);
-            uploadBtn.disabled = isLoading;
-            if (isLoading) {
-                resultArea.innerHTML = '';
-                uploadBtn.classList.add('animate-pulse');
-                uploadBtn.textContent = '...';
-                renderLoadingState();
-            } else {
-                uploadBtn.classList.remove('animate-pulse');
-                uploadBtn.textContent = 'Upload';
-            }
-        };
 
-        const showToast = (message, type = 'success') => {
-            clearTimeout(toastTimeout);
-            const existingToast = document.querySelector('.toast');
-            if (existingToast) existingToast.remove();
-            const toast = document.createElement('div');
-            toast.className = 'toast fixed top-4 right-4 p-3 rounded-md shadow-lg flex items-center gap-3 bg-[#1e1e3f] border z-50 w-max max-w-xs';
-            const text = document.createElement('span');
-            text.className = 'text-xs font-semibold';
-            text.textContent = message;
-            let icon, borderColor;
-            if (type === 'success') {
-                borderColor = 'border-green-500/50';
-                text.classList.add('text-green-400');
-                icon = `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>`;
-            } else {
-                borderColor = 'border-red-500/50';
-                text.classList.add('text-red-400');
-                icon = `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-red-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>`;
-            }
-            toast.classList.add(borderColor);
-            toast.innerHTML = icon;
-            toast.appendChild(text);
-            document.body.appendChild(toast);
-            requestAnimationFrame(() => toast.classList.add('show'));
-            toastTimeout = setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => toast.remove(), 400);
-            }, 3000);
-        };
-
-        const copyToClipboard = (text, buttonElement) => {
-            if (buttonElement) {
-                const originalIcon = buttonElement.innerHTML;
-                const successIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>`;
-                navigator.clipboard.writeText(text).then(() => {
-                    buttonElement.innerHTML = successIcon;
-                    setTimeout(() => { buttonElement.innerHTML = originalIcon; }, 2000);
-                });
-            } else {
-                 navigator.clipboard.writeText(text);
-            }
-        };
-        
         const formatFileSize = (bytes) => {
             if (bytes === 0) return '0 Bytes';
             const k = 1024;
@@ -469,17 +199,205 @@
             return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
         };
         
-        loadFilesFromStorage();
+        const updateFileInfo = () => {
+            resultArea.innerHTML = '';
+            const file = fileInput.files[0];
+            selectedFileDiv.classList.toggle('hidden', !file);
+            if (file) {
+                const group = fileTypeGroups[file.name.split('.').pop()?.toLowerCase()] || 'default';
+                const iconSVG = fileIconsSVG[group] || fileIconsSVG['default'];
+                selectedFileDiv.innerHTML = `<div class="flex items-center gap-2 p-2 bg-[#2a2a4e] rounded-md border border-[#4a4a6a]"><div class="flex-shrink-0">${iconSVG}</div><div class="flex-grow overflow-hidden"><p class="text-slate-100 font-medium text-xs truncate">${file.name}</p><p class="text-[10px] text-slate-400">${formatFileSize(file.size)}</p></div><button id="clearBtn" class="flex-shrink-0 text-slate-500 hover:text-white transition-colors" title="Clear selection"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg></button></div>`;
+                document.getElementById('clearBtn').addEventListener('click', resetFileInput);
+            }
+        };
+
+        const showToast = (message, type = 'success') => {
+            clearTimeout(toastTimeout);
+            document.querySelector('.toast')?.remove();
+            const toast = document.createElement('div');
+            toast.className = `toast fixed top-4 right-4 p-3 rounded-md shadow-lg flex items-center gap-3 bg-[#1e1e3f] border z-50 w-max max-w-xs ${type === 'success' ? 'border-green-500/50' : 'border-red-500/50'}`;
+            const text = document.createElement('span');
+            text.className = `text-xs font-semibold ${type === 'success' ? 'text-green-400' : 'text-red-400'}`;
+            text.textContent = message;
+            const icon = type === 'success' ? `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>` : `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-red-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>`;
+            toast.innerHTML = icon;
+            toast.appendChild(text);
+            document.body.appendChild(toast);
+            requestAnimationFrame(() => toast.classList.add('show'));
+            toastTimeout = setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 400); }, 3000);
+        };
+
+        const copyToClipboard = (text, buttonElement) => {
+            const originalIcon = buttonElement?.innerHTML;
+            const successIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>`;
+            navigator.clipboard.writeText(text).then(() => {
+                if (buttonElement) { buttonElement.innerHTML = successIcon; setTimeout(() => { buttonElement.innerHTML = originalIcon; }, 2000); }
+            });
+        };
+        
+        const openModal = () => {
+            renderMyFiles();
+            renderHistory();
+            modal.classList.remove('opacity-0', 'pointer-events-none', '-z-10');
+            modal.classList.add('z-50');
+            modal.querySelector('.modal-content').classList.remove('scale-95');
+        };
+        const closeModal = () => {
+            modal.classList.add('opacity-0');
+            modal.querySelector('.modal-content').classList.add('scale-95');
+            setTimeout(() => modal.classList.add('pointer-events-none', '-z-10'), 300);
+        };
+        
+        const switchTab = (activeTab) => {
+            const tabs = [myFilesTab, historyTab];
+            const contents = [myFilesContent, historyContent];
+            tabs.forEach((tab, index) => {
+                const content = contents[index];
+                if (tab === activeTab) {
+                    tab.classList.add('text-[#ffc300]', 'border-b-2', 'border-[#ffc300]');
+                    tab.classList.remove('text-slate-400', 'hover:text-slate-200');
+                    content.classList.remove('hidden');
+                } else {
+                    tab.classList.remove('text-[#ffc300]', 'border-b-2', 'border-[#ffc300]');
+                    tab.classList.add('text-slate-400', 'hover:text-slate-200');
+                    content.classList.add('hidden');
+                }
+            });
+        };
+        
+        const renderMyFiles = () => {
+            const files = getFiles();
+            if (files.length === 0) { myFilesContent.innerHTML = `<p class="text-center text-slate-400 text-sm py-8">No files managed yet.</p>`; return; }
+            myFilesContent.innerHTML = files.map(file => `
+                <div class="file-item bg-[#2a2a4e]/50 p-3 rounded-md mb-2 flex flex-col sm:flex-row sm:items-center gap-3" data-id="${file.id}" data-extension="${file.extension}">
+                    <div class="flex-grow flex items-center gap-3 overflow-hidden">
+                        ${fileIconsSVG[fileTypeGroups[file.extension] || 'default']}
+                        <div class="overflow-hidden">
+                            <p class="font-semibold text-xs truncate" title="${file.name}">${file.name}</p>
+                            <p class="text-[10px] text-slate-400">${file.size} &bull; ${file.date}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 flex-shrink-0 mt-2 sm:mt-0">
+                        <select title="Expiry" class="expiry-select bg-[#1e1e3f] border border-[#3a3a5a] text-xs rounded p-1">
+                            <option value="permanent" ${file.expires_at === 'Permanent' ? 'selected' : ''}>Permanent</option>
+                            <optgroup label="Hours">
+                                <option value="1h">1 Hour</option> <option value="6h">6 Hours</option> <option value="12h">12 Hours</option> <option value="24h">24 Hours</option>
+                            </optgroup>
+                             <optgroup label="Days">
+                                <option value="1d">1 Day</option> <option value="7d">7 Days</option> <option value="30d">30 Days</option>
+                            </optgroup>
+                        </select>
+                        <button title="Toggle Privacy" class="privacy-btn p-1.5 rounded ${file.is_private ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}">${file.is_private ? 'Private' : 'Public'}</button>
+                        <button title="Delete File" class="delete-btn p-1.5 rounded bg-red-500/20 text-red-400">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        };
+        
+        const renderHistory = () => {
+            const files = getFiles();
+            if (files.length === 0) { historyContent.innerHTML = `<p class="text-center text-slate-400 text-sm py-8">No upload history.</p>`; return; }
+            historyContent.innerHTML = files.map(file => `
+                <div class="history-item bg-[#2a2a4e]/50 p-3 rounded-md mb-2 flex items-center justify-between gap-3" data-id="${file.id}">
+                    <div class="flex-grow flex items-center gap-3 overflow-hidden">
+                        ${fileIconsSVG[fileTypeGroups[file.extension] || 'default']}
+                        <div class="overflow-hidden">
+                            <p class="font-semibold text-xs truncate" title="${file.name}">${file.name}</p>
+                            <p class="text-[10px] text-slate-400">${file.size} &bull; ${file.date}</p>
+                        </div>
+                    </div>
+                    <button title="Remove from history" class="history-delete-btn p-1.5 rounded bg-red-500/20 text-red-400">Remove</button>
+                </div>
+            `).join('');
+        };
+
+        const handleFileAction = async (e) => {
+            const item = e.target.closest('.file-item');
+            if (!item) return;
+            const id = item.dataset.id;
+            const extension = item.dataset.extension;
+            let files = getFiles();
+            const fileIndex = files.findIndex(f => f.id === id);
+
+            if (e.target.matches('.privacy-btn')) {
+                const is_private = !files[fileIndex].is_private;
+                const { success } = await updateFileOnServer({ id, extension, is_private });
+                if(success) {
+                    files[fileIndex].is_private = is_private;
+                    saveFiles(files);
+                    renderMyFiles();
+                    showToast('Privacy updated!', 'success');
+                } else { showToast('Update failed!', 'error'); }
+            }
+            if (e.target.matches('.delete-btn')) {
+                if (confirm('Are you sure you want to permanently delete this file? This cannot be undone.')) {
+                    const { success } = await deleteFileOnServer({ id, extension });
+                    if(success) {
+                        files.splice(fileIndex, 1);
+                        saveFiles(files);
+                        renderMyFiles();
+                        renderHistory();
+                        showToast('File deleted!', 'success');
+                    } else { showToast('Deletion failed!', 'error'); }
+                }
+            }
+            if (e.target.matches('.expiry-select')) {
+                 const selectedValue = e.target.value;
+                 let expires_at = 'permanent';
+                 if (selectedValue !== 'permanent') {
+                     const now = new Date();
+                     const amount = parseInt(selectedValue);
+                     const unit = selectedValue.slice(-1);
+                     if (unit === 'h') now.setHours(now.getHours() + amount);
+                     if (unit === 'd') now.setDate(now.getDate() + amount);
+                     expires_at = now.toISOString();
+                 }
+                 const { success } = await updateFileOnServer({ id, extension, expires_at });
+                 if(success) {
+                    showToast('Expiry updated!', 'success');
+                 } else { showToast('Update failed!', 'error'); }
+            }
+        };
+        
+        const handleHistoryAction = (e) => {
+            if (!e.target.matches('.history-delete-btn')) return;
+            const item = e.target.closest('.history-item');
+            const id = item.dataset.id;
+            let files = getFiles();
+            files = files.filter(f => f.id !== id);
+            saveFiles(files);
+            renderHistory();
+            renderMyFiles();
+            showToast('Removed from history.', 'success');
+        };
+
+        const updateFileOnServer = async (payload) => {
+            try {
+                const res = await fetch('/file/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                return { success: res.ok };
+            } catch (err) { return { success: false }; }
+        };
+
+        const deleteFileOnServer = async (payload) => {
+             try {
+                const res = await fetch('/file/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                return { success: res.ok };
+            } catch (err) { return { success: false }; }
+        };
+
         uploadBtn.addEventListener('click', uploadFile);
         fileInput.addEventListener('change', updateFileInfo);
         fab.addEventListener('click', openModal);
-        modalOverlay.addEventListener('click', closeModal);
-        modalCloseBtn.addEventListener('click', closeModal);
-        tabButtons.forEach(btn => btn.addEventListener('click', (e) => switchTab(e.currentTarget.dataset.tab)));
-        
-        ['dragenter', 'dragover'].forEach(eventName => fileInputLabel.addEventListener(eventName, (e) => { e.preventDefault(); e.stopPropagation(); fileInputLabel.classList.add('border-[#ffc300]', 'bg-[#2a2a4e]'); }, false));
-        ['dragleave', 'drop'].forEach(eventName => fileInputLabel.addEventListener(eventName, (e) => { e.preventDefault(); e.stopPropagation(); fileInputLabel.classList.remove('border-[#ffc300]', 'bg-[#2a2a4e]'); }, false));
-        fileInputLabel.addEventListener('drop', e => { fileInput.files = e.dataTransfer.files; updateFileInfo(); uploadFile(); }, false);
+        closeModalBtn.addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+        myFilesTab.addEventListener('click', () => switchTab(myFilesTab));
+        historyTab.addEventListener('click', () => switchTab(historyTab));
+        myFilesContent.addEventListener('click', handleFileAction);
+        myFilesContent.addEventListener('change', handleFileAction);
+        historyContent.addEventListener('click', handleHistoryAction);
+        ['dragenter', 'dragover'].forEach(ev => fileInputLabel.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); fileInputLabel.classList.add('border-[#ffc300]', 'bg-[#2a2a4e]'); }));
+        ['dragleave', 'drop'].forEach(ev => fileInputLabel.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); fileInputLabel.classList.remove('border-[#ffc300]', 'bg-[#2a2a4e]'); }));
+        fileInputLabel.addEventListener('drop', e => { fileInput.files = e.dataTransfer.files; updateFileInfo(); });
     });
     </script>
 </body>
