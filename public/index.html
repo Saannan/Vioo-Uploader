@@ -4,10 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vioo Uploader</title>
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
     <script src="https://cdn.tailwindcss.com"></script>
+    
     <style type="text/tailwindcss">
         @layer base {
             html {
@@ -28,11 +31,23 @@
         .toast.show {
             transform: translateX(0);
         }
-        .modal {
-            transition: opacity 0.3s ease, transform 0.3s ease;
+        .modal-overlay {
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+        }
+        .modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
         }
         .modal-content {
-             transition: transform 0.3s ease;
+            transform: scale(0.9);
+            opacity: 0;
+            transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+        }
+        .modal-overlay.show .modal-content {
+            transform: scale(1);
+            opacity: 1;
         }
     </style>
 </head>
@@ -40,12 +55,14 @@
 
     <main class="w-full max-w-md mx-auto">
         <div class="bg-[#1e1e3f]/80 backdrop-blur-sm border border-[#3a3a5a] rounded-lg shadow-2xl shadow-black/50 overflow-hidden">
+
             <div class="p-5 text-center border-b border-[#3a3a5a]">
                 <h2 class="text-lg font-bold tracking-wide">
                     <span class="text-[#ffc300]">Vioo</span> Uploader
                 </h2>
                 <p class="text-slate-400 mt-1 text-[11px]">Upload, store, and share your files securely.</p>
             </div>
+            
             <div class="p-5 space-y-3">
                 <label for="fileInput" class="file-input-label relative block p-5 border-2 border-dashed border-[#4a4a6a] rounded-md text-center cursor-pointer bg-transparent transition-all duration-300 hover:border-[#ffc300] hover:bg-[#2a2a4e]">
                     <div class="flex flex-col items-center justify-center pointer-events-none">
@@ -57,41 +74,41 @@
                     </div>
                     <input type="file" id="fileInput" class="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer"/>
                 </label>
+                
                 <div id="selectedFile" class="hidden"></div>
+                
                 <div>
                      <button id="uploadBtn" class="w-full py-2 px-4 bg-[#ffc300] rounded-md text-[#1a1a2e] font-bold uppercase tracking-wider text-xs transition-all duration-300 ease-in-out transform hover:scale-[1.02] hover:brightness-105 focus:outline-none focus:ring-4 focus:ring-[#ffc300]/50 disabled:opacity-40 disabled:cursor-not-allowed disabled:scale-100 disabled:brightness-100">
                         Upload
                     </button>
                 </div>
+                
                 <div id="resultArea" class="pt-2"></div>
             </div>
         </div>
     </main>
 
-    <button id="fab" class="fixed bottom-6 right-6 bg-[#ffc300] text-[#1a1a2e] w-14 h-14 rounded-full shadow-lg flex items-center justify-center transform hover:scale-110 transition-transform">
+    <button id="historyFab" class="fixed bottom-6 right-6 bg-[#ffc300] text-[#1a1a2e] w-14 h-14 rounded-full flex items-center justify-center shadow-lg shadow-black/50 hover:bg-[#ffd64a] transition-all duration-300 transform hover:scale-110 focus:outline-none focus:ring-4 focus:ring-[#ffc300]/50" title="Upload History">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M5 8h14M5 12h14M5 16h14" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
         </svg>
     </button>
     
-    <div id="managementModal" class="modal fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 opacity-0 pointer-events-none -z-10">
-        <div class="modal-content w-full max-w-2xl bg-[#1e1e3f] border border-[#3a3a5a] rounded-lg shadow-2xl transform scale-95">
-            <div class="flex justify-between items-center p-4 border-b border-[#3a3a5a]">
-                <h3 class="text-lg font-semibold text-slate-100">File Manager</h3>
-                <button id="closeModalBtn" class="text-slate-400 hover:text-white">&times;</button>
+    <div id="historyModal" class="modal-overlay fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="modal-content bg-[#1e1e3f] border border-[#3a3a5a] rounded-lg shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
+            <div class="flex items-center justify-between p-4 border-b border-[#3a3a5a]">
+                <h3 class="text-md font-bold text-slate-100">Upload History</h3>
+                <button id="closeHistoryModal" class="text-slate-400 hover:text-white transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
             </div>
-            <div class="p-4">
-                <div class="border-b border-[#3a3a5a]">
-                    <nav class="flex space-x-4" aria-label="Tabs">
-                        <button id="myFilesTab" class="tab-btn text-[#ffc300] border-b-2 border-[#ffc300] px-3 py-2 text-sm font-medium">My Files</button>
-                        <button id="historyTab" class="tab-btn text-slate-400 hover:text-slate-200 px-3 py-2 text-sm font-medium">Upload History</button>
-                    </nav>
-                </div>
-                <div id="myFilesContent" class="tab-content mt-4 max-h-[60vh] overflow-y-auto"></div>
-                <div id="historyContent" class="tab-content mt-4 max-h-[60vh] overflow-y-auto hidden"></div>
+            <div id="historyList" class="p-4 space-y-3 overflow-y-auto">
             </div>
         </div>
     </div>
+
 
     <script>
     document.addEventListener('DOMContentLoaded', () => {
@@ -100,48 +117,125 @@
         const resultArea = document.getElementById('resultArea');
         const selectedFileDiv = document.getElementById('selectedFile');
         const fileInputLabel = document.querySelector('.file-input-label');
-        const fab = document.getElementById('fab');
-        const modal = document.getElementById('managementModal');
-        const closeModalBtn = document.getElementById('closeModalBtn');
-        const myFilesTab = document.getElementById('myFilesTab');
-        const historyTab = document.getElementById('historyTab');
-        const myFilesContent = document.getElementById('myFilesContent');
-        const historyContent = document.getElementById('historyContent');
+
+        const historyFab = document.getElementById('historyFab');
+        const historyModal = document.getElementById('historyModal');
+        const closeHistoryModal = document.getElementById('closeHistoryModal');
+        const historyList = document.getElementById('historyList');
 
         let loadingInterval;
         let toastTimeout;
-        const VIOO_FILES_KEY = 'vioo_files';
-        const fileTypeGroups = { 'png': 'image', 'jpg': 'image', 'jpeg': 'image', 'gif': 'image', 'svg': 'image', 'webp': 'image', 'mp4': 'video', 'mov': 'video', 'avi': 'video', 'mp3': 'audio', 'wav': 'audio', 'ogg': 'audio', 'zip': 'archive', 'rar': 'archive', '7z': 'archive', 'js': 'code', 'html': 'code', 'css': 'code', 'json': 'code', 'py': 'code', 'java': 'code', 'doc': 'pdf', 'docx': 'pdf', 'xls': 'pdf', 'xlsx': 'pdf', 'ppt': 'pdf', 'pptx': 'pdf' };
-        const iconClasses = 'w-4 h-4 text-[#ffc300]';
-        const fileIconsSVG = { 'pdf': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>`, 'image': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>`, 'video': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 010 .656l-5.603 3.113a.375.375 0 01-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112z" /></svg>`, 'audio': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V7.5A2.25 2.25 0 0013.5 6H5.25A2.25 2.25 0 003 8.25v8.25a2.25 2.25 0 002.25 2.25h3.841M15 18a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" /></svg>`, 'archive': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>`, 'code': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" /></svg>`, 'default': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>` };
-        
-        const getFiles = () => JSON.parse(localStorage.getItem(VIOO_FILES_KEY)) || [];
-        const saveFiles = (files) => localStorage.setItem(VIOO_FILES_KEY, JSON.stringify(files));
 
-        const addFileToHistory = (fileData) => {
-            const files = getFiles();
-            const existingIndex = files.findIndex(f => f.id === fileData.id);
-            if (existingIndex > -1) {
-                files[existingIndex] = fileData;
-            } else {
-                files.unshift(fileData);
-            }
-            saveFiles(files);
+        const iconClasses = 'w-4 h-4 text-[#ffc300]';
+        const bigIconClasses = 'w-6 h-6 text-[#ffc300]';
+        const fileIconsSVG = {
+            'pdf': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>`,
+            'image': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>`,
+            'video': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 010 .656l-5.603 3.113a.375.375 0 01-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112z" /></svg>`,
+            'audio': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V7.5A2.25 2.25 0 0013.5 6H5.25A2.25 2.25 0 003 8.25v8.25a2.25 2.25 0 002.25 2.25h3.841M15 18a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" /></svg>`,
+            'archive': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>`,
+            'code': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" /></svg>`,
+            'default': `<svg class="${iconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>`,
+        };
+        const bigFileIconsSVG = {
+             'pdf': `<svg class="${bigIconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>`,
+            'image': `<svg class="${bigIconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>`,
+            'video': `<svg class="${bigIconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 010 .656l-5.603 3.113a.375.375 0 01-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112z" /></svg>`,
+            'audio': `<svg class="${bigIconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V7.5A2.25 2.25 0 0013.5 6H5.25A2.25 2.25 0 003 8.25v8.25a2.25 2.25 0 002.25 2.25h3.841M15 18a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" /></svg>`,
+            'archive': `<svg class="${bigIconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>`,
+            'code': `<svg class="${bigIconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" /></svg>`,
+            'default': `<svg class="${bigIconClasses}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>`,
+        };
+        const fileTypeGroups = { 'png': 'image', 'jpg': 'image', 'jpeg': 'image', 'gif': 'image', 'svg': 'image', 'webp': 'image', 'mp4': 'video', 'mov': 'video', 'avi': 'video', 'mp3': 'audio', 'wav': 'audio', 'ogg': 'audio', 'zip': 'archive', 'rar': 'archive', '7z': 'archive', 'js': 'code', 'html': 'code', 'css': 'code', 'json': 'code', 'py': 'code', 'java': 'code', 'doc': 'pdf', 'docx': 'pdf', 'xls': 'pdf', 'xlsx': 'pdf', 'ppt': 'pdf', 'pptx': 'pdf' };
+
+        const getHistory = () => {
+            const history = localStorage.getItem('viooUploaderHistory');
+            return history ? JSON.parse(history) : [];
         };
 
+        const saveHistory = (history) => {
+            localStorage.setItem('viooUploaderHistory', JSON.stringify(history));
+        };
+
+        const addToHistory = (fileDetails) => {
+            const history = getHistory();
+            history.unshift(fileDetails);
+            saveHistory(history);
+        };
+        
+        const removeFromHistory = (fileId) => {
+            let history = getHistory();
+            history = history.filter(item => item.id !== fileId);
+            saveHistory(history);
+            renderHistoryList();
+        };
+
+        const renderHistoryList = () => {
+            const history = getHistory();
+            historyList.innerHTML = '';
+            if (history.length === 0) {
+                historyList.innerHTML = `<p class="text-center text-slate-500 text-sm py-8">No upload history found.</p>`;
+                return;
+            }
+
+            history.forEach(item => {
+                const group = fileTypeGroups[item.extension] || 'default';
+                const iconSVG = bigFileIconsSVG[group] || bigFileIconsSVG['default'];
+                const itemHtml = `
+                    <div class="w-full text-left bg-[#2a2a4e]/50 border border-[#4a4a6a] rounded-md p-3 flex items-center gap-3 relative transition-all duration-300">
+                        <div class="flex-shrink-0">${iconSVG}</div>
+                        <div class="flex-grow overflow-hidden">
+                            <p class="text-xs text-slate-100 font-semibold truncate" title="${item.name}">${item.name}</p>
+                            <p class="text-[10px] text-slate-400">${item.size} - Uploaded on ${item.date}</p>
+                        </div>
+                        <div class="flex-shrink-0 flex items-center gap-2">
+                             <button class="btn-copy-history text-slate-400 hover:text-white transition-colors" title="Copy link" data-url="${item.url}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM5 11a1 1 0 100 2h4a1 1 0 100-2H5z"></path><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3 1h10a1 1 0 011 1v8a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z" clip-rule="evenodd"></path></svg>
+                            </button>
+                            <button class="btn-delete-history text-slate-400 hover:text-red-400 transition-colors" title="Delete from history" data-id="${item.id}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1z" clip-rule="evenodd"></path></svg>
+                            </button>
+                        </div>
+                    </div>`;
+                historyList.insertAdjacentHTML('beforeend', itemHtml);
+            });
+            
+            historyList.querySelectorAll('.btn-copy-history').forEach(btn => {
+                btn.addEventListener('click', (e) => copyToClipboard(e.currentTarget.dataset.url, e.currentTarget));
+            });
+
+            historyList.querySelectorAll('.btn-delete-history').forEach(btn => {
+                btn.addEventListener('click', (e) => removeFromHistory(e.currentTarget.dataset.id));
+            });
+        };
+        
         const uploadFile = async () => {
             const file = fileInput.files[0];
-            if (!file) { showToast('Please select a file first.', 'error'); return; }
+            if (!file) {
+                showToast('Please select a file first.', 'error');
+                return;
+            }
+
             setLoadingState(true);
             const formData = new FormData();
             formData.append('file', file);
+
             try {
-                const response = await fetch('/upload', { method: 'POST', body: formData });
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData,
+                });
+
                 const result = await response.json();
-                if (!response.ok) { throw new Error(result.data || result.error || 'Upload failed.'); }
+
+                if (!response.ok) {
+                    throw new Error(result.message || result.error || 'Upload failed.');
+                }
+                
                 showToast(result.message || 'Upload Successful!', 'success');
-                addFileToHistory(result.data);
-                renderDetailCard(result.data);
+                addToHistory(result.data);
+                renderDetailCard(file, result.data);
+
             } catch (error) {
                 showToast(error.message, 'error');
                 resetFileInput();
@@ -149,11 +243,38 @@
                 setLoadingState(false);
             }
         };
+        
+        const renderLoadingState = () => {
+            const loadingStates = ["Checking file...", "Securing connection...", "Almost there...", "Uploading..."];
+            let stateIndex = 0;
+            
+            resultArea.innerHTML = `
+                <div class="flex items-center justify-center gap-3 p-4">
+                    <svg class="w-5 h-5 animate-spin text-[#ffc300]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span id="loadingText" class="text-xs text-slate-300 transition-opacity duration-300">${loadingStates[0]}</span>
+                </div>`;
+            
+            const loadingTextElement = document.getElementById('loadingText');
+            if (!loadingTextElement) return;
 
-        const renderDetailCard = (fileData) => {
+            loadingInterval = setInterval(() => {
+                stateIndex = (stateIndex + 1) % loadingStates.length;
+                loadingTextElement.style.opacity = '0';
+                setTimeout(() => {
+                    loadingTextElement.textContent = loadingStates[stateIndex];
+                    loadingTextElement.style.opacity = '1';
+                }, 300);
+            }, 1500);
+        };
+
+        const renderDetailCard = (file, data) => {
             resetFileInput();
-            const group = fileTypeGroups[fileData.extension] || 'default';
-            const iconSVG = fileIconsSVG[group] || fileIconsSVG['default'];
+            const group = fileTypeGroups[data.extension] || 'default';
+            const iconSVG = bigFileIconsSVG[group] || bigFileIconsSVG['default'];
+            
             resultArea.innerHTML = `
                 <div class="w-full text-left bg-[#2a2a4e]/50 border border-[#4a4a6a] rounded-md p-3 flex items-center gap-3 relative transition-all duration-300">
                     <button class="btn-copy absolute top-2 right-2 text-slate-400 hover:text-white transition-colors" title="Copy link">
@@ -161,28 +282,11 @@
                     </button>
                     <div class="flex-shrink-0">${iconSVG}</div>
                     <div class="flex-grow overflow-hidden">
-                        <p class="text-xs text-slate-100 font-semibold truncate" title="${fileData.name}">${fileData.name}</p>
-                        <p class="text-[10px] text-slate-400">${fileData.size} - ${fileData.mimetype || 'unknown type'}</p>
+                        <p class="text-xs text-slate-100 font-semibold truncate" title="${data.name}">${data.name}</p>
+                        <p class="text-[10px] text-slate-400">${data.size} - ${data.mimetype || 'unknown type'}</p>
                     </div>
                 </div>`;
-            resultArea.querySelector('.btn-copy').addEventListener('click', (e) => copyToClipboard(fileData.url, e.currentTarget));
-        };
-        
-        const setLoadingState = (isLoading) => {
-            clearInterval(loadingInterval);
-            uploadBtn.disabled = isLoading;
-            uploadBtn.textContent = isLoading ? '...' : 'Upload';
-            if (isLoading) { uploadBtn.classList.add('animate-pulse'); renderLoadingState(); }
-            else { uploadBtn.classList.remove('animate-pulse'); }
-        };
-
-        const renderLoadingState = () => {
-            const states = ["Checking file...", "Securing connection...", "Almost there...", "Uploading..."];
-            let idx = 0;
-            resultArea.innerHTML = `<div class="flex items-center justify-center gap-3 p-4"><svg class="w-5 h-5 animate-spin text-[#ffc300]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span id="loadingText" class="text-xs text-slate-300 transition-opacity duration-300">${states[0]}</span></div>`;
-            const textEl = document.getElementById('loadingText');
-            if (!textEl) return;
-            loadingInterval = setInterval(() => { idx = (idx + 1) % states.length; textEl.style.opacity = '0'; setTimeout(() => { textEl.textContent = states[idx]; textEl.style.opacity = '1'; }, 300); }, 1500);
+            resultArea.querySelector('.btn-copy').addEventListener('click', (e) => copyToClipboard(data.url, e.currentTarget));
         };
 
         const resetFileInput = () => {
@@ -190,7 +294,101 @@
              selectedFileDiv.innerHTML = '';
              selectedFileDiv.classList.add('hidden');
         };
+        
+        const updateFileInfo = () => {
+            resultArea.innerHTML = '';
+            const file = fileInput.files[0];
+            selectedFileDiv.classList.toggle('hidden', !file);
+            
+            if (file) {
+                const fileExt = file.name.split('.').pop()?.toLowerCase() || 'default';
+                const group = fileTypeGroups[fileExt] || 'default';
+                const iconSVG = fileIconsSVG[group] || fileIconsSVG['default'];
 
+                selectedFileDiv.innerHTML = `
+                    <div class="flex items-center gap-2 p-2 bg-[#2a2a4e] rounded-md border border-[#4a4a6a]">
+                        <div class="flex-shrink-0">${iconSVG}</div>
+                        <div class="flex-grow overflow-hidden">
+                            <p class="text-slate-100 font-medium text-xs truncate">${file.name}</p>
+                            <p class="text-[10px] text-slate-400">${formatFileSize(file.size)}</p>
+                        </div>
+                        <button id="clearBtn" class="flex-shrink-0 text-slate-500 hover:text-white transition-colors" title="Clear selection">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg>
+                        </button>
+                    </div>`;
+                document.getElementById('clearBtn').addEventListener('click', resetFileInput);
+            }
+        };
+        
+        const setLoadingState = (isLoading) => {
+            clearInterval(loadingInterval);
+            uploadBtn.disabled = isLoading;
+            if (isLoading) {
+                resultArea.innerHTML = '';
+                uploadBtn.classList.add('animate-pulse');
+                uploadBtn.textContent = '...';
+                renderLoadingState();
+            } else {
+                uploadBtn.classList.remove('animate-pulse');
+                uploadBtn.textContent = 'Upload';
+            }
+        };
+
+        const showToast = (message, type = 'success') => {
+            clearTimeout(toastTimeout);
+            const existingToast = document.querySelector('.toast');
+            if (existingToast) {
+                existingToast.remove();
+            }
+
+            const toast = document.createElement('div');
+            toast.className = 'toast fixed top-4 right-4 p-3 rounded-md shadow-lg flex items-center gap-3 bg-[#1e1e3f] border z-50 w-max max-w-xs';
+            
+            const text = document.createElement('span');
+            text.className = 'text-xs font-semibold';
+            text.textContent = message;
+
+            let icon, borderColor;
+            if (type === 'success') {
+                borderColor = 'border-green-500/50';
+                text.classList.add('text-green-400');
+                icon = `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>`;
+            } else {
+                borderColor = 'border-red-500/50';
+                text.classList.add('text-red-400');
+                icon = `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-red-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>`;
+            }
+            toast.classList.add(borderColor);
+            toast.innerHTML = icon;
+            toast.appendChild(text);
+            document.body.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.add('show');
+            });
+
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 400);
+            }, 3000);
+        };
+
+        const copyToClipboard = (text, buttonElement) => {
+            if (buttonElement) {
+                const originalIcon = buttonElement.innerHTML;
+                const successIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>`;
+                
+                navigator.clipboard.writeText(text).then(() => {
+                    buttonElement.innerHTML = successIcon;
+                    setTimeout(() => {
+                        buttonElement.innerHTML = originalIcon;
+                    }, 2000);
+                });
+            } else {
+                 navigator.clipboard.writeText(text);
+            }
+        };
+        
         const formatFileSize = (bytes) => {
             if (bytes === 0) return '0 Bytes';
             const k = 1024;
@@ -198,206 +396,46 @@
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
         };
-        
-        const updateFileInfo = () => {
-            resultArea.innerHTML = '';
-            const file = fileInput.files[0];
-            selectedFileDiv.classList.toggle('hidden', !file);
-            if (file) {
-                const group = fileTypeGroups[file.name.split('.').pop()?.toLowerCase()] || 'default';
-                const iconSVG = fileIconsSVG[group] || fileIconsSVG['default'];
-                selectedFileDiv.innerHTML = `<div class="flex items-center gap-2 p-2 bg-[#2a2a4e] rounded-md border border-[#4a4a6a]"><div class="flex-shrink-0">${iconSVG}</div><div class="flex-grow overflow-hidden"><p class="text-slate-100 font-medium text-xs truncate">${file.name}</p><p class="text-[10px] text-slate-400">${formatFileSize(file.size)}</p></div><button id="clearBtn" class="flex-shrink-0 text-slate-500 hover:text-white transition-colors" title="Clear selection"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg></button></div>`;
-                document.getElementById('clearBtn').addEventListener('click', resetFileInput);
-            }
-        };
-
-        const showToast = (message, type = 'success') => {
-            clearTimeout(toastTimeout);
-            document.querySelector('.toast')?.remove();
-            const toast = document.createElement('div');
-            toast.className = `toast fixed top-4 right-4 p-3 rounded-md shadow-lg flex items-center gap-3 bg-[#1e1e3f] border z-50 w-max max-w-xs ${type === 'success' ? 'border-green-500/50' : 'border-red-500/50'}`;
-            const text = document.createElement('span');
-            text.className = `text-xs font-semibold ${type === 'success' ? 'text-green-400' : 'text-red-400'}`;
-            text.textContent = message;
-            const icon = type === 'success' ? `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>` : `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-red-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>`;
-            toast.innerHTML = icon;
-            toast.appendChild(text);
-            document.body.appendChild(toast);
-            requestAnimationFrame(() => toast.classList.add('show'));
-            toastTimeout = setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 400); }, 3000);
-        };
-
-        const copyToClipboard = (text, buttonElement) => {
-            const originalIcon = buttonElement?.innerHTML;
-            const successIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>`;
-            navigator.clipboard.writeText(text).then(() => {
-                if (buttonElement) { buttonElement.innerHTML = successIcon; setTimeout(() => { buttonElement.innerHTML = originalIcon; }, 2000); }
-            });
-        };
-        
-        const openModal = () => {
-            renderMyFiles();
-            renderHistory();
-            modal.classList.remove('opacity-0', 'pointer-events-none', '-z-10');
-            modal.classList.add('z-50');
-            modal.querySelector('.modal-content').classList.remove('scale-95');
-        };
-        const closeModal = () => {
-            modal.classList.add('opacity-0');
-            modal.querySelector('.modal-content').classList.add('scale-95');
-            setTimeout(() => modal.classList.add('pointer-events-none', '-z-10'), 300);
-        };
-        
-        const switchTab = (activeTab) => {
-            const tabs = [myFilesTab, historyTab];
-            const contents = [myFilesContent, historyContent];
-            tabs.forEach((tab, index) => {
-                const content = contents[index];
-                if (tab === activeTab) {
-                    tab.classList.add('text-[#ffc300]', 'border-b-2', 'border-[#ffc300]');
-                    tab.classList.remove('text-slate-400', 'hover:text-slate-200');
-                    content.classList.remove('hidden');
-                } else {
-                    tab.classList.remove('text-[#ffc300]', 'border-b-2', 'border-[#ffc300]');
-                    tab.classList.add('text-slate-400', 'hover:text-slate-200');
-                    content.classList.add('hidden');
-                }
-            });
-        };
-        
-        const renderMyFiles = () => {
-            const files = getFiles();
-            if (files.length === 0) { myFilesContent.innerHTML = `<p class="text-center text-slate-400 text-sm py-8">No files managed yet.</p>`; return; }
-            myFilesContent.innerHTML = files.map(file => `
-                <div class="file-item bg-[#2a2a4e]/50 p-3 rounded-md mb-2 flex flex-col sm:flex-row sm:items-center gap-3" data-id="${file.id}" data-extension="${file.extension}">
-                    <div class="flex-grow flex items-center gap-3 overflow-hidden">
-                        ${fileIconsSVG[fileTypeGroups[file.extension] || 'default']}
-                        <div class="overflow-hidden">
-                            <p class="font-semibold text-xs truncate" title="${file.name}">${file.name}</p>
-                            <p class="text-[10px] text-slate-400">${file.size} &bull; ${file.date}</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-2 flex-shrink-0 mt-2 sm:mt-0">
-                        <select title="Expiry" class="expiry-select bg-[#1e1e3f] border border-[#3a3a5a] text-xs rounded p-1">
-                            <option value="permanent" ${file.expires_at === 'Permanent' ? 'selected' : ''}>Permanent</option>
-                            <optgroup label="Hours">
-                                <option value="1h">1 Hour</option> <option value="6h">6 Hours</option> <option value="12h">12 Hours</option> <option value="24h">24 Hours</option>
-                            </optgroup>
-                             <optgroup label="Days">
-                                <option value="1d">1 Day</option> <option value="7d">7 Days</option> <option value="30d">30 Days</option>
-                            </optgroup>
-                        </select>
-                        <button title="Toggle Privacy" class="privacy-btn p-1.5 rounded ${file.is_private ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}">${file.is_private ? 'Private' : 'Public'}</button>
-                        <button title="Delete File" class="delete-btn p-1.5 rounded bg-red-500/20 text-red-400">Delete</button>
-                    </div>
-                </div>
-            `).join('');
-        };
-        
-        const renderHistory = () => {
-            const files = getFiles();
-            if (files.length === 0) { historyContent.innerHTML = `<p class="text-center text-slate-400 text-sm py-8">No upload history.</p>`; return; }
-            historyContent.innerHTML = files.map(file => `
-                <div class="history-item bg-[#2a2a4e]/50 p-3 rounded-md mb-2 flex items-center justify-between gap-3" data-id="${file.id}">
-                    <div class="flex-grow flex items-center gap-3 overflow-hidden">
-                        ${fileIconsSVG[fileTypeGroups[file.extension] || 'default']}
-                        <div class="overflow-hidden">
-                            <p class="font-semibold text-xs truncate" title="${file.name}">${file.name}</p>
-                            <p class="text-[10px] text-slate-400">${file.size} &bull; ${file.date}</p>
-                        </div>
-                    </div>
-                    <button title="Remove from history" class="history-delete-btn p-1.5 rounded bg-red-500/20 text-red-400">Remove</button>
-                </div>
-            `).join('');
-        };
-
-        const handleFileAction = async (e) => {
-            const item = e.target.closest('.file-item');
-            if (!item) return;
-            const id = item.dataset.id;
-            const extension = item.dataset.extension;
-            let files = getFiles();
-            const fileIndex = files.findIndex(f => f.id === id);
-
-            if (e.target.matches('.privacy-btn')) {
-                const is_private = !files[fileIndex].is_private;
-                const { success } = await updateFileOnServer({ id, extension, is_private });
-                if(success) {
-                    files[fileIndex].is_private = is_private;
-                    saveFiles(files);
-                    renderMyFiles();
-                    showToast('Privacy updated!', 'success');
-                } else { showToast('Update failed!', 'error'); }
-            }
-            if (e.target.matches('.delete-btn')) {
-                if (confirm('Are you sure you want to permanently delete this file? This cannot be undone.')) {
-                    const { success } = await deleteFileOnServer({ id, extension });
-                    if(success) {
-                        files.splice(fileIndex, 1);
-                        saveFiles(files);
-                        renderMyFiles();
-                        renderHistory();
-                        showToast('File deleted!', 'success');
-                    } else { showToast('Deletion failed!', 'error'); }
-                }
-            }
-            if (e.target.matches('.expiry-select')) {
-                 const selectedValue = e.target.value;
-                 let expires_at = 'permanent';
-                 if (selectedValue !== 'permanent') {
-                     const now = new Date();
-                     const amount = parseInt(selectedValue);
-                     const unit = selectedValue.slice(-1);
-                     if (unit === 'h') now.setHours(now.getHours() + amount);
-                     if (unit === 'd') now.setDate(now.getDate() + amount);
-                     expires_at = now.toISOString();
-                 }
-                 const { success } = await updateFileOnServer({ id, extension, expires_at });
-                 if(success) {
-                    showToast('Expiry updated!', 'success');
-                 } else { showToast('Update failed!', 'error'); }
-            }
-        };
-        
-        const handleHistoryAction = (e) => {
-            if (!e.target.matches('.history-delete-btn')) return;
-            const item = e.target.closest('.history-item');
-            const id = item.dataset.id;
-            let files = getFiles();
-            files = files.filter(f => f.id !== id);
-            saveFiles(files);
-            renderHistory();
-            renderMyFiles();
-            showToast('Removed from history.', 'success');
-        };
-
-        const updateFileOnServer = async (payload) => {
-            try {
-                const res = await fetch('/file/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                return { success: res.ok };
-            } catch (err) { return { success: false }; }
-        };
-
-        const deleteFileOnServer = async (payload) => {
-             try {
-                const res = await fetch('/file/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                return { success: res.ok };
-            } catch (err) { return { success: false }; }
-        };
 
         uploadBtn.addEventListener('click', uploadFile);
         fileInput.addEventListener('change', updateFileInfo);
-        fab.addEventListener('click', openModal);
-        closeModalBtn.addEventListener('click', closeModal);
-        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
-        myFilesTab.addEventListener('click', () => switchTab(myFilesTab));
-        historyTab.addEventListener('click', () => switchTab(historyTab));
-        myFilesContent.addEventListener('click', handleFileAction);
-        myFilesContent.addEventListener('change', handleFileAction);
-        historyContent.addEventListener('click', handleHistoryAction);
-        ['dragenter', 'dragover'].forEach(ev => fileInputLabel.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); fileInputLabel.classList.add('border-[#ffc300]', 'bg-[#2a2a4e]'); }));
-        ['dragleave', 'drop'].forEach(ev => fileInputLabel.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); fileInputLabel.classList.remove('border-[#ffc300]', 'bg-[#2a2a4e]'); }));
-        fileInputLabel.addEventListener('drop', e => { fileInput.files = e.dataTransfer.files; updateFileInfo(); });
+        
+        ['dragenter', 'dragover'].forEach(eventName => {
+            fileInputLabel.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                fileInputLabel.classList.add('border-[#ffc300]', 'bg-[#2a2a4e]');
+            }, false);
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            fileInputLabel.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                fileInputLabel.classList.remove('border-[#ffc300]', 'bg-[#2a2a4e]');
+            }, false);
+        });
+
+        fileInputLabel.addEventListener('drop', e => {
+            fileInput.files = e.dataTransfer.files;
+            updateFileInfo();
+            uploadFile();
+        }, false);
+
+        historyFab.addEventListener('click', () => {
+            renderHistoryList();
+            historyModal.classList.add('show');
+        });
+
+        closeHistoryModal.addEventListener('click', () => {
+            historyModal.classList.remove('show');
+        });
+        
+        historyModal.addEventListener('click', (e) => {
+            if (e.target === historyModal) {
+                historyModal.classList.remove('show');
+            }
+        });
+
     });
     </script>
 </body>
