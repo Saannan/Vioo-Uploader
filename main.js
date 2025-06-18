@@ -4,10 +4,10 @@ const path = require('path');
 const multer = require('multer');
 const crypto = require('crypto');
 
-function randomCharacter() {
+function randomCharacter(amount) {
     const letter = 'abcdefghijklmnopqrstuvwxyz';
     let results = '';
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < amount; i++) {
         const randomIndex = Math.floor(Math.random() * letter.length);
         let randomLetters = letter[randomIndex];
         randomLetters = Math.random() < 0.5 ? randomLetters.toUpperCase() : randomLetters;
@@ -19,7 +19,7 @@ function randomCharacter() {
 function formatFileSize(bytes) {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 }
@@ -49,7 +49,7 @@ app.use(express.json());
 app.get('/upload', (req, res) => {
     res.status(405).json({
         error: 'Method Not Allowed',
-        message: 'This endpoint only accepts POST requests to upload files.'
+        message: 'Only POST request to upload files.'
     });
 });
 
@@ -74,43 +74,46 @@ app.post('/upload', upload.single('file'), async (req, res) => {
 
         if (existingFile) {
             const fileDetails = {
-                id: existingFile.file_id,
+                id: path.parse(existingFile.file_path).name,
                 name: existingFile.original_name,
                 size: formatFileSize(existingFile.size_bytes),
                 mimetype: existingFile.mimetype,
                 extension: path.extname(existingFile.file_path).substring(1).toLowerCase(),
                 url: `${CUSTOM_DOMAIN}/v/${existingFile.file_path}`,
                 is_private: existingFile.is_private,
-                expires_at: existingFile.expires_at,
+                expires_at: existingFile.expires_at ? formatDate(new Date(existingFile.expires_at)) : 'Permanent',
                 date: formatDate(new Date(existingFile.created_at))
             };
             return res.json({ success: true, message: 'File already exists.', data: fileDetails });
         }
 
         const fileExt = path.extname(req.file.originalname).substring(1).toLowerCase() || 'bin';
-        const randomId = randomCharacter();
+        const randomId = randomCharacter(6);
         const filePath = `${randomId}.${fileExt}`;
-        const uploadDate = new Date();
 
         const { error: uploadError } = await supabase.storage
             .from(BUCKET_NAME)
-            .upload(filePath, fileBuffer, { contentType: req.file.mimetype, cacheControl: '3600', upsert: false });
+            .upload(filePath, fileBuffer, {
+                contentType: req.file.mimetype,
+                cacheControl: '3600',
+                upsert: false
+            });
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+            throw uploadError;
+        }
 
-        const { data: newRecord, error: recordError } = await supabase
+        const newFileData = {
+            file_path: filePath,
+            file_hash: fileHash,
+            original_name: req.file.originalname,
+            mimetype: req.file.mimetype,
+            size_bytes: req.file.size
+        };
+
+        const { data: insertedFile, error: recordError } = await supabase
             .from('files')
-            .insert({
-                file_id: randomId,
-                file_path: filePath,
-                file_hash: fileHash,
-                original_name: req.file.originalname,
-                mimetype: req.file.mimetype,
-                size_bytes: req.file.size,
-                is_private: false,
-                expires_at: null,
-                created_at: uploadDate
-            })
+            .insert(newFileData)
             .select()
             .single();
 
@@ -120,15 +123,15 @@ app.post('/upload', upload.single('file'), async (req, res) => {
         }
 
         const fileDetails = {
-            id: newRecord.file_id,
-            name: newRecord.original_name,
-            size: formatFileSize(newRecord.size_bytes),
-            mimetype: newRecord.mimetype,
+            id: randomId,
+            name: insertedFile.original_name,
+            size: formatFileSize(insertedFile.size_bytes),
+            mimetype: insertedFile.mimetype,
             extension: fileExt,
-            url: `${CUSTOM_DOMAIN}/v/${newRecord.file_path}`,
-            is_private: newRecord.is_private,
-            expires_at: newRecord.expires_at,
-            date: formatDate(new Date(newRecord.created_at))
+            url: `${CUSTOM_DOMAIN}/v/${filePath}`,
+            is_private: insertedFile.is_private,
+            expires_at: 'Permanent',
+            date: formatDate(new Date(insertedFile.created_at))
         };
         res.status(201).json({ success: true, message: 'Upload successful!', data: fileDetails });
 
@@ -137,50 +140,95 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     }
 });
 
-app.post('/api/file/:id/manage', async (req, res) => {
-    const { id } = req.params;
-    const { is_private, expires_at } = req.body;
-    
+app.get('/v/:fileName', async (req, res) => {
+    const { fileName } = req.params;
     try {
-        const { data, error } = await supabase
+        const { data: fileData, error: dbError } = await supabase
             .from('files')
-            .update({ is_private, expires_at })
-            .eq('file_id', id)
-            .select()
+            .select('is_private, expires_at')
+            .eq('file_path', fileName)
             .single();
 
-        if (error) throw error;
-        if (!data) return res.status(404).json({ error: 'File not found.' });
+        if (dbError || !fileData) {
+            return res.status(404).send('File not found.');
+        }
+
+        if (fileData.is_private) {
+            return res.status(403).send('This file is private.');
+        }
+
+        if (fileData.expires_at && new Date(fileData.expires_at) < new Date()) {
+            return res.status(410).send('This file has expired and is no longer available.');
+        }
+
+        const { data, error: downloadError } = await supabase.storage
+            .from(BUCKET_NAME)
+            .download(fileName);
+
+        if (downloadError) {
+            return res.status(404).send('File not found in storage.');
+        }
         
+        const fileExt = fileName.split('.').pop()?.toLowerCase();
+        const mimeTypes = { 'html': 'text/plain', 'htm': 'text/plain' };
+        const contentType = mimeTypes[fileExt] || data.type || 'application/octet-stream';
+        
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Length', data.size);
+        res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+        data.arrayBuffer().then(buffer => res.send(Buffer.from(buffer)));
+
+    } catch (err) {
+        res.status(500).send('Internal server error.');
+    }
+});
+
+app.post('/file/update', async (req, res) => {
+    const { id, extension, is_private, expires_at } = req.body;
+    if (!id || !extension) {
+        return res.status(400).json({ error: 'File ID and extension are required.' });
+    }
+
+    try {
+        const filePath = `${id}.${extension}`;
+        const updateData = {};
+        if (typeof is_private === 'boolean') {
+            updateData.is_private = is_private;
+        }
+        if (expires_at) {
+            updateData.expires_at = expires_at === 'permanent' ? null : new Date(expires_at);
+        }
+
+        const { error } = await supabase
+            .from('files')
+            .update(updateData)
+            .eq('file_path', filePath);
+
+        if (error) throw error;
         res.json({ success: true, message: 'File updated successfully.' });
     } catch (err) {
         res.status(500).json({ error: 'Could not update file.', data: err.message });
     }
 });
 
-app.delete('/api/file/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-        const { data: file, error: fetchError } = await supabase
-            .from('files')
-            .select('file_path')
-            .eq('file_id', id)
-            .single();
+app.post('/file/delete', async (req, res) => {
+    const { id, extension } = req.body;
+     if (!id || !extension) {
+        return res.status(400).json({ error: 'File ID and extension are required.' });
+    }
 
-        if (fetchError || !file) throw new Error('File not found in database.');
-        
+    try {
+        const filePath = `${id}.${extension}`;
         const { error: storageError } = await supabase.storage
             .from(BUCKET_NAME)
-            .remove([file.file_path]);
-
-        if (storageError) throw new Error('Failed to delete file from storage.');
+            .remove([filePath]);
+        if (storageError) throw storageError;
 
         const { error: dbError } = await supabase
             .from('files')
             .delete()
-            .eq('file_id', id);
-        
-        if (dbError) throw new Error('Failed to delete file record from database.');
+            .eq('file_path', filePath);
+        if (dbError) throw dbError;
 
         res.json({ success: true, message: 'File deleted successfully.' });
     } catch (err) {
@@ -188,64 +236,6 @@ app.delete('/api/file/:id', async (req, res) => {
     }
 });
 
-app.get('/v/:fileName', async (req, res) => {
-    const { fileName } = req.params;
-    try {
-        const { data: file, error: dbError } = await supabase
-            .from('files')
-            .select('is_private, expires_at')
-            .eq('file_path', fileName)
-            .single();
-
-        if (dbError || !file) {
-            return res.status(404).send('File not found.');
-        }
-
-        if (file.is_private) {
-            return res.status(403).send('This file is private.');
-        }
-
-        if (file.expires_at && new Date(file.expires_at) < new Date()) {
-            return res.status(410).send('This file has expired and is no longer available.');
-        }
-        
-        const { data, error } = await supabase.storage
-            .from(BUCKET_NAME)
-            .download(fileName);
-
-        if (error) {
-            return res.status(404).json({ error: 'File not found or inaccessible' });
-        }
-
-        const arrayBuffer = await data.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        const mimeTypes = {
-            'txt': 'text/plain', 'html': 'text/html', 'htm': 'text/html', 'css': 'text/css', 'js': 'application/javascript', 'json': 'application/json', 'xml': 'application/xml',
-            'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'gif': 'image/gif', 'svg': 'image/svg+xml', 'webp': 'image/webp', 'ico': 'image/x-icon',
-            'mp3': 'audio/mpeg', 'wav': 'audio/wav', 'ogg': 'audio/ogg', 'flac': 'audio/flac',
-            'mp4': 'video/mp4', 'webm': 'video/webm', 'mov': 'video/quicktime', 'avi': 'video/x-msvideo',
-            'pdf': 'application/pdf',
-            'zip': 'application/zip', 'rar': 'application/vnd.rar', '7z': 'application/x-7z-compressed', 'tar': 'application/x-tar',
-            'doc': 'application/msword', 'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'xls': 'application/vnd.ms-excel', 'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'ppt': 'application/vnd.ms-powerpoint', 'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-            'otf': 'font/otf', 'ttf': 'font/ttf', 'woff': 'font/woff', 'woff2': 'font/woff2'
-        };
-        const fileExt = fileName.split('.').pop()?.toLowerCase();
-        let contentType = mimeTypes[fileExt] || 'application/octet-stream';
-
-        if (fileExt === 'html' || fileExt === 'htm') {
-            contentType = 'text/plain; charset=utf-8';
-        }
-
-        res.setHeader('Content-Type', contentType);
-        res.setHeader('Content-Length', buffer.length);
-        res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
-        res.send(buffer);
-    } catch (err) {
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
