@@ -4,10 +4,10 @@ const path = require('path');
 const multer = require('multer');
 const crypto = require('crypto');
 
-function randomCharacter(amount) {
+function randomCharacter() {
     const letter = 'abcdefghijklmnopqrstuvwxyz';
     let results = '';
-    for (let i = 0; i < amount; i++) {
+    for (let i = 0; i < 6; i++) {
         const randomIndex = Math.floor(Math.random() * letter.length);
         let randomLetters = letter[randomIndex];
         randomLetters = Math.random() < 0.5 ? randomLetters.toUpperCase() : randomLetters;
@@ -34,9 +34,9 @@ function formatDate(date) {
 const app = express();
 const port = process.env.PORT || 5000;
 
-const SUPABASE_URL = 'https://qkxtptourezjcitqsnvv.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFreHRwdG91cmV6amNpdHFzbnZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxNTQwMzAsImV4cCI6MjA2NTczMDAzMH0.4jMdZVQIJ_mx8VDQqYL8mjsABuYc9gjLdvS4lI3PLDg';
-const BUCKET_NAME = 'vioo-uploader';
+const SUPABASE_URL = 'https://fllyfxfiwajcmkqpvabz.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZsbHlmeGZpd2FqY21rcXB2YWJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAyNjA4NzMsImV4cCI6MjA2NTgzNjg3M30.fxav0iq1OX8iQ4IzD0pnGtOTb73E9yCf6-9v6d_Wb78';
+const BUCKET_NAME = 'uploader';
 const CUSTOM_DOMAIN = 'https://cdn.vioo.my.id';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -61,11 +61,10 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     try {
         const fileBuffer = req.file.buffer;
         const fileHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
-        const uploadDate = new Date();
-
+        
         const { data: existingFile, error: checkError } = await supabase
-            .from('file_deduplication')
-            .select('file_path')
+            .from('files')
+            .select('*')
             .eq('file_hash', fileHash)
             .single();
 
@@ -74,53 +73,62 @@ app.post('/upload', upload.single('file'), async (req, res) => {
         }
 
         if (existingFile) {
-            const fileUrl = `${CUSTOM_DOMAIN}/v/${existingFile.file_path}`;
             const fileDetails = {
-                id: path.parse(existingFile.file_path).name,
-                name: req.file.originalname,
-                size: formatFileSize(req.file.size),
-                mimetype: req.file.mimetype,
+                id: existingFile.file_id,
+                name: existingFile.original_name,
+                size: formatFileSize(existingFile.size_bytes),
+                mimetype: existingFile.mimetype,
                 extension: path.extname(existingFile.file_path).substring(1).toLowerCase(),
-                url: fileUrl,
-                date: formatDate(uploadDate)
+                url: `${CUSTOM_DOMAIN}/v/${existingFile.file_path}`,
+                is_private: existingFile.is_private,
+                expires_at: existingFile.expires_at,
+                date: formatDate(new Date(existingFile.created_at))
             };
             return res.json({ success: true, message: 'File already exists.', data: fileDetails });
         }
 
         const fileExt = path.extname(req.file.originalname).substring(1).toLowerCase() || 'bin';
-        const randomId = randomCharacter(6);
+        const randomId = randomCharacter();
         const filePath = `${randomId}.${fileExt}`;
+        const uploadDate = new Date();
 
         const { error: uploadError } = await supabase.storage
             .from(BUCKET_NAME)
-            .upload(filePath, fileBuffer, {
-                contentType: req.file.mimetype,
-                cacheControl: '3600',
-                upsert: false
-            });
+            .upload(filePath, fileBuffer, { contentType: req.file.mimetype, cacheControl: '3600', upsert: false });
 
-        if (uploadError) {
-            throw uploadError;
-        }
+        if (uploadError) throw uploadError;
 
-        const { error: recordError } = await supabase
-            .from('file_deduplication')
-            .insert({ file_hash: fileHash, file_path: filePath });
+        const { data: newRecord, error: recordError } = await supabase
+            .from('files')
+            .insert({
+                file_id: randomId,
+                file_path: filePath,
+                file_hash: fileHash,
+                original_name: req.file.originalname,
+                mimetype: req.file.mimetype,
+                size_bytes: req.file.size,
+                is_private: false,
+                expires_at: null,
+                created_at: uploadDate
+            })
+            .select()
+            .single();
 
         if (recordError) {
             await supabase.storage.from(BUCKET_NAME).remove([filePath]);
             throw recordError;
         }
 
-        const newFileUrl = `${CUSTOM_DOMAIN}/v/${filePath}`;
         const fileDetails = {
-            id: randomId,
-            name: req.file.originalname,
-            size: formatFileSize(req.file.size),
-            mimetype: req.file.mimetype,
+            id: newRecord.file_id,
+            name: newRecord.original_name,
+            size: formatFileSize(newRecord.size_bytes),
+            mimetype: newRecord.mimetype,
             extension: fileExt,
-            url: newFileUrl,
-            date: formatDate(uploadDate)
+            url: `${CUSTOM_DOMAIN}/v/${newRecord.file_path}`,
+            is_private: newRecord.is_private,
+            expires_at: newRecord.expires_at,
+            date: formatDate(new Date(newRecord.created_at))
         };
         res.status(201).json({ success: true, message: 'Upload successful!', data: fileDetails });
 
@@ -129,54 +137,78 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     }
 });
 
-
-app.post('/check-hash', async (req, res) => {
-    const { fileHash } = req.body;
-    if (!fileHash) {
-        return res.status(400).json({ error: 'fileHash is required' });
-    }
+app.post('/api/file/:id/manage', async (req, res) => {
+    const { id } = req.params;
+    const { is_private, expires_at } = req.body;
+    
     try {
         const { data, error } = await supabase
-            .from('file_deduplication')
-            .select('file_path')
-            .eq('file_hash', fileHash)
+            .from('files')
+            .update({ is_private, expires_at })
+            .eq('file_id', id)
+            .select()
             .single();
 
-        if (error && error.code !== 'PGRST116') {
-            throw error;
-        }
-
-        if (data) {
-            res.json({ exists: true, path: data.file_path });
-        } else {
-            res.json({ exists: false });
-        }
+        if (error) throw error;
+        if (!data) return res.status(404).json({ error: 'File not found.' });
+        
+        res.json({ success: true, message: 'File updated successfully.' });
     } catch (err) {
-        res.status(500).json({ error: 'Could not check hash', data: err.message });
+        res.status(500).json({ error: 'Could not update file.', data: err.message });
     }
 });
 
-app.post('/record-upload', async (req, res) => {
-    const { fileHash, filePath } = req.body;
-    if (!fileHash || !filePath) {
-        return res.status(400).json({ error: 'fileHash and filePath are required' });
-    }
+app.delete('/api/file/:id', async (req, res) => {
+    const { id } = req.params;
     try {
-        const { error } = await supabase
-            .from('file_deduplication')
-            .insert({ file_hash: fileHash, file_path: filePath });
-        
-        if (error) throw error;
+        const { data: file, error: fetchError } = await supabase
+            .from('files')
+            .select('file_path')
+            .eq('file_id', id)
+            .single();
 
-        res.status(201).json({ success: true });
+        if (fetchError || !file) throw new Error('File not found in database.');
+        
+        const { error: storageError } = await supabase.storage
+            .from(BUCKET_NAME)
+            .remove([file.file_path]);
+
+        if (storageError) throw new Error('Failed to delete file from storage.');
+
+        const { error: dbError } = await supabase
+            .from('files')
+            .delete()
+            .eq('file_id', id);
+        
+        if (dbError) throw new Error('Failed to delete file record from database.');
+
+        res.json({ success: true, message: 'File deleted successfully.' });
     } catch (err) {
-        res.status(500).json({ error: 'Could not record upload', data: err.message });
+        res.status(500).json({ error: 'Could not delete file.', data: err.message });
     }
 });
 
 app.get('/v/:fileName', async (req, res) => {
     const { fileName } = req.params;
     try {
+        const { data: file, error: dbError } = await supabase
+            .from('files')
+            .select('is_private, expires_at')
+            .eq('file_path', fileName)
+            .single();
+
+        if (dbError || !file) {
+            return res.status(404).send('File not found.');
+        }
+
+        if (file.is_private) {
+            return res.status(403).send('This file is private.');
+        }
+
+        if (file.expires_at && new Date(file.expires_at) < new Date()) {
+            return res.status(410).send('This file has expired and is no longer available.');
+        }
+        
         const { data, error } = await supabase.storage
             .from(BUCKET_NAME)
             .download(fileName);
