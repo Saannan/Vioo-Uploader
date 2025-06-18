@@ -127,7 +127,7 @@
                 }
                 
                 showToast(result.message || 'Upload Successful!', 'success');
-                renderDetailCard(file, result.data.data.url);
+                renderDetailCard(file, result.url);
 
             } catch (error) {
                 showToast(error.message, 'error');
