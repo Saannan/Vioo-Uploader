@@ -19,7 +19,7 @@ function randomCharacter(amount) {
 function formatFileSize(bytes) {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 }
@@ -28,7 +28,7 @@ function formatDate(date) {
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
-    return `${day}/${month} ${year}`;
+    return `${day}/${month}/${year}`;
 }
 
 const app = express();
@@ -49,7 +49,7 @@ app.use(express.json());
 app.get('/upload', (req, res) => {
     res.status(405).json({
         error: 'Method Not Allowed',
-        message: 'Only POST request to upload files.'
+        message: 'This endpoint only accepts POST requests to upload files.'
     });
 });
 
@@ -61,10 +61,11 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     try {
         const fileBuffer = req.file.buffer;
         const fileHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
-        
+        const uploadDate = new Date();
+
         const { data: existingFile, error: checkError } = await supabase
-            .from('files')
-            .select('*')
+            .from('file_deduplication')
+            .select('file_path')
             .eq('file_hash', fileHash)
             .single();
 
@@ -73,16 +74,15 @@ app.post('/upload', upload.single('file'), async (req, res) => {
         }
 
         if (existingFile) {
+            const fileUrl = `${CUSTOM_DOMAIN}/v/${existingFile.file_path}`;
             const fileDetails = {
                 id: path.parse(existingFile.file_path).name,
-                name: existingFile.original_name,
-                size: formatFileSize(existingFile.size_bytes),
-                mimetype: existingFile.mimetype,
+                name: req.file.originalname,
+                size: formatFileSize(req.file.size),
+                mimetype: req.file.mimetype,
                 extension: path.extname(existingFile.file_path).substring(1).toLowerCase(),
-                url: `${CUSTOM_DOMAIN}/v/${existingFile.file_path}`,
-                is_private: existingFile.is_private,
-                expires_at: existingFile.expires_at ? formatDate(new Date(existingFile.expires_at)) : 'Permanent',
-                date: formatDate(new Date(existingFile.created_at))
+                url: fileUrl,
+                date: formatDate(uploadDate)
             };
             return res.json({ success: true, message: 'File already exists.', data: fileDetails });
         }
@@ -103,35 +103,24 @@ app.post('/upload', upload.single('file'), async (req, res) => {
             throw uploadError;
         }
 
-        const newFileData = {
-            file_path: filePath,
-            file_hash: fileHash,
-            original_name: req.file.originalname,
-            mimetype: req.file.mimetype,
-            size_bytes: req.file.size
-        };
-
-        const { data: insertedFile, error: recordError } = await supabase
-            .from('files')
-            .insert(newFileData)
-            .select()
-            .single();
+        const { error: recordError } = await supabase
+            .from('file_deduplication')
+            .insert({ file_hash: fileHash, file_path: filePath });
 
         if (recordError) {
             await supabase.storage.from(BUCKET_NAME).remove([filePath]);
             throw recordError;
         }
 
+        const newFileUrl = `${CUSTOM_DOMAIN}/v/${filePath}`;
         const fileDetails = {
             id: randomId,
-            name: insertedFile.original_name,
-            size: formatFileSize(insertedFile.size_bytes),
-            mimetype: insertedFile.mimetype,
+            name: req.file.originalname,
+            size: formatFileSize(req.file.size),
+            mimetype: req.file.mimetype,
             extension: fileExt,
-            url: `${CUSTOM_DOMAIN}/v/${filePath}`,
-            is_private: insertedFile.is_private,
-            expires_at: 'Permanent',
-            date: formatDate(new Date(insertedFile.created_at))
+            url: newFileUrl,
+            date: formatDate(uploadDate)
         };
         res.status(201).json({ success: true, message: 'Upload successful!', data: fileDetails });
 
@@ -140,102 +129,91 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     }
 });
 
+
+app.post('/check-hash', async (req, res) => {
+    const { fileHash } = req.body;
+    if (!fileHash) {
+        return res.status(400).json({ error: 'fileHash is required' });
+    }
+    try {
+        const { data, error } = await supabase
+            .from('file_deduplication')
+            .select('file_path')
+            .eq('file_hash', fileHash)
+            .single();
+
+        if (error && error.code !== 'PGRST116') {
+            throw error;
+        }
+
+        if (data) {
+            res.json({ exists: true, path: data.file_path });
+        } else {
+            res.json({ exists: false });
+        }
+    } catch (err) {
+        res.status(500).json({ error: 'Could not check hash', data: err.message });
+    }
+});
+
+app.post('/record-upload', async (req, res) => {
+    const { fileHash, filePath } = req.body;
+    if (!fileHash || !filePath) {
+        return res.status(400).json({ error: 'fileHash and filePath are required' });
+    }
+    try {
+        const { error } = await supabase
+            .from('file_deduplication')
+            .insert({ file_hash: fileHash, file_path: filePath });
+        
+        if (error) throw error;
+
+        res.status(201).json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Could not record upload', data: err.message });
+    }
+});
+
 app.get('/v/:fileName', async (req, res) => {
     const { fileName } = req.params;
     try {
-        const { data: fileData, error: dbError } = await supabase
-            .from('files')
-            .select('is_private, expires_at')
-            .eq('file_path', fileName)
-            .single();
-
-        if (dbError || !fileData) {
-            return res.status(404).send('File not found.');
-        }
-
-        if (fileData.is_private) {
-            return res.status(403).send('This file is private.');
-        }
-
-        if (fileData.expires_at && new Date(fileData.expires_at) < new Date()) {
-            return res.status(410).send('This file has expired and is no longer available.');
-        }
-
-        const { data, error: downloadError } = await supabase.storage
+        const { data, error } = await supabase.storage
             .from(BUCKET_NAME)
             .download(fileName);
 
-        if (downloadError) {
-            return res.status(404).send('File not found in storage.');
+        if (error) {
+            return res.status(404).json({ error: 'File not found or inaccessible' });
         }
-        
+
+        const arrayBuffer = await data.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const mimeTypes = {
+            'txt': 'text/plain', 'html': 'text/html', 'htm': 'text/html', 'css': 'text/css', 'js': 'application/javascript', 'json': 'application/json', 'xml': 'application/xml',
+            'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'gif': 'image/gif', 'svg': 'image/svg+xml', 'webp': 'image/webp', 'ico': 'image/x-icon',
+            'mp3': 'audio/mpeg', 'wav': 'audio/wav', 'ogg': 'audio/ogg', 'flac': 'audio/flac',
+            'mp4': 'video/mp4', 'webm': 'video/webm', 'mov': 'video/quicktime', 'avi': 'video/x-msvideo',
+            'pdf': 'application/pdf',
+            'zip': 'application/zip', 'rar': 'application/vnd.rar', '7z': 'application/x-7z-compressed', 'tar': 'application/x-tar',
+            'doc': 'application/msword', 'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'xls': 'application/vnd.ms-excel', 'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'ppt': 'application/vnd.ms-powerpoint', 'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'otf': 'font/otf', 'ttf': 'font/ttf', 'woff': 'font/woff', 'woff2': 'font/woff2'
+        };
         const fileExt = fileName.split('.').pop()?.toLowerCase();
-        const mimeTypes = { 'html': 'text/plain', 'htm': 'text/plain' };
-        const contentType = mimeTypes[fileExt] || data.type || 'application/octet-stream';
-        
+        let contentType = mimeTypes[fileExt] || 'application/octet-stream';
+
+        if (fileExt === 'html' || fileExt === 'htm') {
+            contentType = 'text/plain; charset=utf-8';
+        }
+
         res.setHeader('Content-Type', contentType);
-        res.setHeader('Content-Length', data.size);
+        res.setHeader('Content-Length', buffer.length);
         res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
-        data.arrayBuffer().then(buffer => res.send(Buffer.from(buffer)));
-
+        res.send(buffer);
     } catch (err) {
-        res.status(500).send('Internal server error.');
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
-
-app.post('/file/update', async (req, res) => {
-    const { id, extension, is_private, expires_at } = req.body;
-    if (!id || !extension) {
-        return res.status(400).json({ error: 'File ID and extension are required.' });
-    }
-
-    try {
-        const filePath = `${id}.${extension}`;
-        const updateData = {};
-        if (typeof is_private === 'boolean') {
-            updateData.is_private = is_private;
-        }
-        if (expires_at) {
-            updateData.expires_at = expires_at === 'permanent' ? null : new Date(expires_at);
-        }
-
-        const { error } = await supabase
-            .from('files')
-            .update(updateData)
-            .eq('file_path', filePath);
-
-        if (error) throw error;
-        res.json({ success: true, message: 'File updated successfully.' });
-    } catch (err) {
-        res.status(500).json({ error: 'Could not update file.', data: err.message });
-    }
-});
-
-app.post('/file/delete', async (req, res) => {
-    const { id, extension } = req.body;
-     if (!id || !extension) {
-        return res.status(400).json({ error: 'File ID and extension are required.' });
-    }
-
-    try {
-        const filePath = `${id}.${extension}`;
-        const { error: storageError } = await supabase.storage
-            .from(BUCKET_NAME)
-            .remove([filePath]);
-        if (storageError) throw storageError;
-
-        const { error: dbError } = await supabase
-            .from('files')
-            .delete()
-            .eq('file_path', filePath);
-        if (dbError) throw dbError;
-
-        res.json({ success: true, message: 'File deleted successfully.' });
-    } catch (err) {
-        res.status(500).json({ error: 'Could not delete file.', data: err.message });
-    }
-});
-
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));

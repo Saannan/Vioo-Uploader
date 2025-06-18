@@ -12,7 +12,7 @@
     ],
     "routes": [
         {
-            "src": "/(upload|v/.*)",
+            "src": "/(upload|check-hash|record-upload|v/.*)",
             "dest": "/main.js"
         },
         {
